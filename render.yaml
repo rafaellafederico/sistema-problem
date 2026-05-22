@@ -30,5 +30,11 @@ services:
         value: https://www.saintgermain.com.br
       - key: FRONTEND_URL
         sync: false
+      - key: INSTAGRAM_USER_ID
+        sync: false
+      - key: INSTAGRAM_PAGE_ACCESS_TOKEN
+        sync: false
+      - key: INSTAGRAM_VERIFY_TOKEN
+        sync: false
     healthCheckPath: /health
     autoDeploy: true

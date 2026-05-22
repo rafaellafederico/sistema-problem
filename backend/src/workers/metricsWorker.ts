@@ -4,6 +4,7 @@ import supabaseService from '../services/supabaseService'
 import nuvemshopService, { NuvemshopMetrics } from '../services/nuvemshopService'
 import openaiService from '../services/openaiService'
 import emailService from '../services/emailService'
+import instagramService from '../services/instagramService'
 import anomalyDetector from './anomalyDetector'
 
 const SITE_URL = process.env.SITE_URL || 'https://www.saintgermain.com.br'
@@ -235,6 +236,11 @@ export function startMetricsWorker(): void {
   // Every 15 minutes: AI analysis
   cron.schedule('*/15 * * * *', async () => {
     await runAIAnalysis()
+  })
+
+  // Every 10 minutes: poll Instagram Graph API for recent comments
+  cron.schedule('*/10 * * * *', async () => {
+    await instagramService.pollRecentComments()
   })
 
   console.log('[MetricsWorker] Cron jobs registered successfully')
