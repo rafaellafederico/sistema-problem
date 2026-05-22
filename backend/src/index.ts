@@ -14,7 +14,6 @@ import alertsRouter from './routes/alerts'
 import instagramRouter from './routes/instagram'
 import nuvemshopRouter from './routes/nuvemshop'
 import aiRouter from './routes/ai'
-import whatsappRouter from './routes/whatsapp'
 import { startMetricsWorker } from './workers/metricsWorker'
 
 const app = express()
@@ -83,7 +82,6 @@ app.use('/api/alerts', alertsRouter)
 app.use('/api/instagram', instagramRouter)
 app.use('/api/nuvemshop', nuvemshopRouter)
 app.use('/api/ai', strictLimiter, aiRouter)
-app.use('/api/whatsapp', whatsappRouter)
 
 // Health check
 app.get('/health', (_req, res) => {

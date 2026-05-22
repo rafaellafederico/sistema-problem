@@ -1,36 +1,22 @@
 version: '3.9'
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Saint Germain — Oracle Cloud VM
-# Roda: Backend Node.js + n8n + Evolution API + Nginx
-# Frontend fica no Vercel (gratuito)
-# Banco de dados fica no Supabase (gratuito)
+# Saint Germain — Desenvolvimento Local
+# Em produção: Frontend → Vercel | Backend → Render.com | DB → Supabase
 # ─────────────────────────────────────────────────────────────────────────────
 
 services:
 
-  # ─── Backend (Node.js Express) ─────────────────────────────────────────────
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
     container_name: sg-backend
     restart: unless-stopped
+    env_file: .env
     environment:
       - PORT=3001
-      - NODE_ENV=production
-      - SUPABASE_URL=${SUPABASE_URL}
-      - SUPABASE_SERVICE_KEY=${SUPABASE_SERVICE_KEY}
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - NUVEMSHOP_STORE_ID=${NUVEMSHOP_STORE_ID}
-      - NUVEMSHOP_ACCESS_TOKEN=${NUVEMSHOP_ACCESS_TOKEN}
-      - EVOLUTION_API_URL=http://evolution:8080
-      - EVOLUTION_API_KEY=${EVOLUTION_API_KEY}
-      - EVOLUTION_INSTANCE_NAME=${EVOLUTION_INSTANCE_NAME:-saint-germain}
-      - WHATSAPP_GROUP_ID=${WHATSAPP_GROUP_ID}
-      - ALERT_PHONE_NUMBER=${ALERT_PHONE_NUMBER}
-      - SITE_URL=${SITE_URL:-https://www.saintgermain.com.br}
-      - FRONTEND_URL=${FRONTEND_URL}
+      - NODE_ENV=development
     ports:
       - "3001:3001"
     networks:
@@ -40,9 +26,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 20s
 
-  # ─── n8n (Workflow Automation) ─────────────────────────────────────────────
   n8n:
     image: n8nio/n8n:latest
     container_name: sg-n8n
@@ -52,17 +36,10 @@ services:
     environment:
       - N8N_BASIC_AUTH_ACTIVE=true
       - N8N_BASIC_AUTH_USER=${N8N_USER:-admin}
-      - N8N_BASIC_AUTH_PASSWORD=${N8N_PASSWORD}
-      - N8N_HOST=0.0.0.0
-      - N8N_PORT=5678
-      - N8N_PROTOCOL=http
-      - WEBHOOK_URL=http://${ORACLE_VM_IP}:5678
+      - N8N_BASIC_AUTH_PASSWORD=${N8N_PASSWORD:-changeme}
       - GENERIC_TIMEZONE=America/Sao_Paulo
       - N8N_LOG_LEVEL=warn
-      - EXECUTIONS_DATA_SAVE_ON_ERROR=all
-      - EXECUTIONS_DATA_SAVE_ON_SUCCESS=last
       - BACKEND_URL=http://backend:3001
-      - SITE_URL=${SITE_URL:-https://www.saintgermain.com.br}
     volumes:
       - n8n_data:/home/node/.n8n
       - ./n8n-workflows:/workflows:ro
@@ -71,58 +48,9 @@ services:
     depends_on:
       - backend
 
-  # ─── Evolution API (WhatsApp Web) ──────────────────────────────────────────
-  evolution:
-    image: atendai/evolution-api:latest
-    container_name: sg-evolution
-    restart: unless-stopped
-    ports:
-      - "8080:8080"
-    environment:
-      - SERVER_URL=http://${ORACLE_VM_IP}:8080
-      - AUTHENTICATION_TYPE=apikey
-      - AUTHENTICATION_API_KEY=${EVOLUTION_API_KEY}
-      - AUTHENTICATION_EXPOSE_IN_FETCH_INSTANCES=true
-      - QRCODE_LIMIT=30
-      - WEBSOCKET_ENABLED=true
-      - CONFIG_SESSION_PHONE_CLIENT=Saint Germain
-      - CONFIG_SESSION_PHONE_NAME=Chrome
-      - STORE_MESSAGES=true
-      - STORE_MESSAGE_UP=true
-      - STORE_CONTACTS=true
-      - STORE_CHATS=true
-      - CLEAN_STORE_CLEANING_INTERVAL=7200
-    volumes:
-      - evolution_data:/evolution/instances
-      - evolution_store:/evolution/store
-    networks:
-      - sg-network
-
-  # ─── Nginx (Reverse Proxy) ─────────────────────────────────────────────────
-  nginx:
-    image: nginx:alpine
-    container_name: sg-nginx
-    restart: unless-stopped
-    ports:
-      - "80:80"
-    volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-    depends_on:
-      - backend
-      - n8n
-      - evolution
-    networks:
-      - sg-network
-
 networks:
   sg-network:
     driver: bridge
-    name: sg-network
 
 volumes:
   n8n_data:
-    driver: local
-  evolution_data:
-    driver: local
-  evolution_store:
-    driver: local

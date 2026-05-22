@@ -3,7 +3,7 @@ import axios from 'axios'
 import supabaseService from '../services/supabaseService'
 import nuvemshopService, { NuvemshopMetrics } from '../services/nuvemshopService'
 import openaiService from '../services/openaiService'
-import evolutionApiService from '../services/evolutionApiService'
+import emailService from '../services/emailService'
 import anomalyDetector from './anomalyDetector'
 
 const SITE_URL = process.env.SITE_URL || 'https://www.saintgermain.com.br'
@@ -64,16 +64,21 @@ async function fetchAndAnalyzeMetrics(): Promise<void> {
           deviation_percent: anomaly.deviation_percent,
         })
 
-        // Send WhatsApp alert for high/critical
+        // Send email alert for high/critical
         if (
           (anomaly.severity === 'critical' || anomaly.severity === 'high') &&
           alert
         ) {
-          await evolutionApiService.sendAlertMessage({
+          await emailService.sendAlertEmail({
             severity: anomaly.severity,
             module: 'Vendas',
             title: anomaly.type,
             description: anomaly.description,
+            metadata: {
+              metric_value: anomaly.current_value,
+              baseline_value: anomaly.baseline_value,
+              deviation_percent: anomaly.deviation_percent,
+            },
           })
 
           if (alert.id) {
@@ -144,11 +149,12 @@ async function checkSiteUptime(): Promise<void> {
       metadata: { url: SITE_URL, response_time_ms: responseTime, status_code: statusCode },
     })
 
-    await evolutionApiService.sendAlertMessage({
+    await emailService.sendAlertEmail({
       severity: 'critical',
       module: 'Site',
       title: 'Site Fora do Ar',
       description: `${SITE_URL} não está respondendo. ${errorMessage || ''}. Tempo de resposta: ${responseTime}ms.`,
+      metadata: { url: SITE_URL, response_time_ms: responseTime, status_code: statusCode },
     })
   } else if (status === 'online' && siteWasOffline) {
     siteWasOffline = false
