@@ -9,7 +9,7 @@ const INSTABILITY_KEYWORDS = [
   'pix não aprova', 'cupom não funciona', 'promoção não aplica',
   'pagamento não aprovado', 'não carrega', 'tá travado', 'bugando',
   'deu erro', 'não abre', 'erro na compra', 'não finaliza',
-  'código não funciona', 'desconto não aplica',
+  'código não funciona', 'desconto não aplica', 'erro',
 ]
 
 const ALL_COMPLAINT_KEYWORDS = [

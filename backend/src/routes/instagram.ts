@@ -37,7 +37,7 @@ const CRITICAL_KEYWORDS = [
 const INSTABILITY_KEYWORDS = [
   'site caiu', 'site fora', 'checkout travando', 'não consigo finalizar',
   'pix não aprova', 'cupom não funciona', 'promoção não aplica',
-  'pagamento não aprovado', 'não carrega', 'tá travado', 'bugando',
+  'pagamento não aprovado', 'não carrega', 'tá travado', 'bugando', 'erro',
 ]
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
