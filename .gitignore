@@ -1,0 +1,62 @@
+# Node / npm
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+package-lock.json
+yarn.lock
+
+# Environment files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.env
+
+# Next.js build output
+frontend/.next/
+frontend/out/
+frontend/build/
+
+# Backend build output
+backend/dist/
+backend/build/
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
+
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+logs/
+*.log
+
+# Docker volumes (local)
+n8n_data/
+nginx/ssl/
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# Misc
+*.pid
+.cache/
+tmp/

@@ -1,0 +1,127 @@
+{
+  "name": "04 — Daily AI Report",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 8 * * *"
+            }
+          ]
+        }
+      },
+      "id": "daily-trigger",
+      "name": "Daily 8am Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.BACKEND_URL || 'http://backend:3001' }}/api/metrics/sales?hours=24",
+        "options": { "timeout": 10000 }
+      },
+      "id": "get-yesterday-metrics",
+      "name": "Get Yesterday Metrics",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.BACKEND_URL || 'http://backend:3001' }}/api/ai/summarize-alerts",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={}",
+        "options": { "timeout": 60000 }
+      },
+      "id": "ai-summarize",
+      "name": "AI Summarize Alerts",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const metrics = $('Get Yesterday Metrics').item.json;\nconst summary = $('AI Summarize Alerts').item.json;\n\nconst sales = metrics.sales || [];\nconst totalRevenue = sales.reduce((sum, s) => sum + (s.revenue_brl || 0), 0);\nconst totalOrders = sales.reduce((sum, s) => sum + (s.orders_count || 0), 0);\nconst avgTicket = totalOrders > 0 ? totalRevenue / totalOrders : 0;\n\nconst aiSummary = summary.summary || {};\nconst alertsAnalyzed = summary.alerts_analyzed || 0;\n\nconst today = new Date().toLocaleDateString('pt-BR', { \n  weekday: 'long', \n  day: '2-digit', \n  month: 'long',\n  timeZone: 'America/Sao_Paulo'\n});\n\nconst report = `📊 *RELATÓRIO DIÁRIO — Saint Germain*\n_${today}_\n\n💰 *Faturamento ontem:* R$${totalRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n📦 *Pedidos:* ${totalOrders}\n🎯 *Ticket médio:* R$${avgTicket.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n\n🤖 *Análise IA:*\n${aiSummary.executive_summary || 'Sem análise disponível.'}\n\n${aiSummary.critical_actions && aiSummary.critical_actions.length > 0 ? \n  '⚡ *Ações prioritárias:*\\n' + aiSummary.critical_actions.map((a, i) => `${i+1}. ${a}`).join('\\n') \n  : ''}\n\n📈 *Status geral:* ${aiSummary.overall_status || 'Normal'}\n🔔 *Alertas analisados:* ${alertsAnalyzed}\n\n_Central Operacional SG_`;\n\nreturn [{ json: { report, metrics: { totalRevenue, totalOrders, avgTicket }, status: aiSummary.overall_status } }];"
+      },
+      "id": "format-report",
+      "name": "Format Report",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.BACKEND_URL || 'http://backend:3001' }}/api/whatsapp/send-report",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ report_text: $json.report }) }}",
+        "options": { "timeout": 15000 }
+      },
+      "id": "send-report-whatsapp",
+      "name": "Send Report via WhatsApp",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1120, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const result = $input.first().json;\nconst report = $('Format Report').item.json;\n\nconsole.log('Daily report sent:', result);\nconsole.log('Revenue:', report.metrics.totalRevenue);\nconsole.log('Orders:', report.metrics.totalOrders);\n\nreturn [{ json: { \n  success: result.success || false, \n  sent_at: new Date().toISOString(),\n  metrics_summary: report.metrics\n} }];"
+      },
+      "id": "log-completion",
+      "name": "Log Completion",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1340, 300]
+    }
+  ],
+  "connections": {
+    "Daily 8am Trigger": {
+      "main": [
+        [{ "node": "Get Yesterday Metrics", "type": "main", "index": 0 }]
+      ]
+    },
+    "Get Yesterday Metrics": {
+      "main": [
+        [{ "node": "AI Summarize Alerts", "type": "main", "index": 0 }]
+      ]
+    },
+    "AI Summarize Alerts": {
+      "main": [
+        [{ "node": "Format Report", "type": "main", "index": 0 }]
+      ]
+    },
+    "Format Report": {
+      "main": [
+        [{ "node": "Send Report via WhatsApp", "type": "main", "index": 0 }]
+      ]
+    },
+    "Send Report via WhatsApp": {
+      "main": [
+        [{ "node": "Log Completion", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveExecutionProgress": true,
+    "saveManualExecutions": true,
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "last",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "staticData": null,
+  "tags": [
+    { "name": "daily-report" },
+    { "name": "ai" }
+  ],
+  "triggerCount": 0,
+  "updatedAt": "2024-06-01T00:00:00.000Z",
+  "versionId": "v1"
+}

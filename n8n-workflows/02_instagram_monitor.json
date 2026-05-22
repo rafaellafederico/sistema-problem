@@ -1,0 +1,192 @@
+{
+  "name": "02 — Instagram Monitor",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "instagram-webhook",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Instagram Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [240, 300],
+      "webhookId": "instagram-sg-webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body;\nconst headers = $input.first().json.headers;\n\n// Handle verification challenge\nif ($input.first().json.query?.['hub.challenge']) {\n  return [{ json: { challenge: $input.first().json.query['hub.challenge'], is_verification: true } }];\n}\n\nconst messages = [];\n\nif (body.object === 'instagram' || body.object === 'page') {\n  const entries = body.entry || [];\n  \n  for (const entry of entries) {\n    // Direct messages\n    const messaging = entry.messaging || [];\n    for (const msg of messaging) {\n      if (msg.message?.text) {\n        messages.push({\n          type: 'dm',\n          text: msg.message.text,\n          sender_id: msg.sender?.id,\n          timestamp: msg.timestamp\n        });\n      }\n    }\n    \n    // Comments\n    const changes = entry.changes || [];\n    for (const change of changes) {\n      if (change.field === 'comments' && change.value?.text) {\n        messages.push({\n          type: 'comment',\n          text: change.value.text,\n          sender_id: change.value?.from?.id,\n          post_id: change.value?.media?.id,\n          timestamp: change.value?.timestamp\n        });\n      }\n    }\n  }\n}\n\nreturn [{ json: { messages, count: messages.length, is_verification: false } }];"
+      },
+      "id": "extract-messages",
+      "name": "Extract Messages",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const { messages } = $input.first().json;\n\nconst COMPLAINT_KEYWORDS = [\n  'problema', 'reclamação', 'horrível', 'péssimo', 'ruim', 'demora', 'atraso',\n  'não chegou', 'errado', 'quebrado', 'defeito', 'cancelar', 'reembolso',\n  'devolver', 'decepcionada', 'decepcionado', 'insatisfeito', 'não funciona',\n  'cadê', 'cadê meu', 'sumiu', 'roubaram', 'golpe', 'fraude', 'procon'\n];\n\nconst complaints = [];\n\nfor (const msg of messages) {\n  const lower = msg.text.toLowerCase();\n  const matched = COMPLAINT_KEYWORDS.filter(kw => lower.includes(kw));\n  \n  if (matched.length > 0) {\n    const criticalWords = ['fraude', 'golpe', 'roubaram', 'procon'];\n    let severity = 'low';\n    if (criticalWords.some(w => lower.includes(w))) severity = 'critical';\n    else if (matched.length >= 4) severity = 'high';\n    else if (matched.length >= 2) severity = 'medium';\n    \n    complaints.push({\n      ...msg,\n      matched_keywords: matched,\n      severity\n    });\n  }\n}\n\nconst hasCriticalOrHigh = complaints.some(c => c.severity === 'critical' || c.severity === 'high');\n\nreturn [{ json: { complaints, count: complaints.length, has_high_priority: hasCriticalOrHigh } }];"
+      },
+      "id": "detect-complaints",
+      "name": "Detect Complaints",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false },
+          "conditions": [
+            {
+              "id": "has-complaints",
+              "leftValue": "={{ $json.count }}",
+              "rightValue": 0,
+              "operator": { "type": "number", "operation": "gt" }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "has-complaints-check",
+      "name": "Has Complaints?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.BACKEND_URL || 'http://backend:3001' }}/api/instagram/analyze",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ messages: $json.complaints.map(c => ({ text: c.text })) }) }}",
+        "options": { "timeout": 30000 }
+      },
+      "id": "ai-classify",
+      "name": "AI Classification",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1120, 200]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false },
+          "conditions": [
+            {
+              "id": "is-critical",
+              "leftValue": "={{ $('Detect Complaints').item.json.has_high_priority }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "equals" }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "is-critical-check",
+      "name": "Is Critical/High?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1120, 380]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.BACKEND_URL || 'http://backend:3001' }}/api/alerts",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ severity: $('Detect Complaints').item.json.complaints[0].severity, module: 'Instagram', title: `${$('Detect Complaints').item.json.count} reclamações detectadas no Instagram`, description: `Palavras-chave: ${$('Detect Complaints').item.json.complaints[0].matched_keywords.join(', ')}`, source: 'instagram', metadata: { complaint_count: $('Detect Complaints').item.json.count, keywords: $('Detect Complaints').item.json.complaints[0].matched_keywords } }) }}",
+        "options": { "timeout": 10000 }
+      },
+      "id": "save-complaint-alert",
+      "name": "Save Complaint Alert",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1340, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.BACKEND_URL || 'http://backend:3001' }}/api/whatsapp/send-alert",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ severity: $('Detect Complaints').item.json.complaints[0].severity, module: 'Instagram', title: `Reclamações detectadas — ${$('Detect Complaints').item.json.count} msgs`, description: `Mensagens com palavras-chave: ${$('Detect Complaints').item.json.complaints.map(c => c.text.substring(0, 50)).join(' | ')}` }) }}",
+        "options": { "timeout": 10000 }
+      },
+      "id": "send-whatsapp-complaint",
+      "name": "Send WhatsApp Alert",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1340, 460]
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "OK"
+      },
+      "id": "webhook-response",
+      "name": "Respond OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1560, 300]
+    }
+  ],
+  "connections": {
+    "Instagram Webhook": {
+      "main": [
+        [{ "node": "Extract Messages", "type": "main", "index": 0 }]
+      ]
+    },
+    "Extract Messages": {
+      "main": [
+        [{ "node": "Detect Complaints", "type": "main", "index": 0 }]
+      ]
+    },
+    "Detect Complaints": {
+      "main": [
+        [{ "node": "Has Complaints?", "type": "main", "index": 0 }]
+      ]
+    },
+    "Has Complaints?": {
+      "main": [
+        [
+          { "node": "AI Classification", "type": "main", "index": 0 },
+          { "node": "Is Critical/High?", "type": "main", "index": 0 }
+        ],
+        [{ "node": "Respond OK", "type": "main", "index": 0 }]
+      ]
+    },
+    "Is Critical/High?": {
+      "main": [
+        [
+          { "node": "Save Complaint Alert", "type": "main", "index": 0 },
+          { "node": "Send WhatsApp Alert", "type": "main", "index": 0 }
+        ],
+        []
+      ]
+    },
+    "Save Complaint Alert": {
+      "main": [
+        [{ "node": "Respond OK", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveExecutionProgress": true,
+    "saveManualExecutions": true,
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "last"
+  },
+  "staticData": null,
+  "tags": [
+    { "name": "instagram" },
+    { "name": "monitoring" }
+  ],
+  "triggerCount": 0,
+  "updatedAt": "2024-06-01T00:00:00.000Z",
+  "versionId": "v1"
+}

@@ -1,0 +1,232 @@
+{
+  "name": "01 — Nuvemshop Monitor",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 5
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.nuvemshop.com.br/v1/{{ $env.NUVEMSHOP_STORE_ID }}/orders",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "payment_status", "value": "paid" },
+            { "name": "per_page", "value": "200" },
+            { "name": "created_at_min", "value": "={{ new Date(Date.now() - 2*60*60*1000).toISOString() }}" }
+          ]
+        },
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "fetch-orders",
+      "name": "Fetch Nuvemshop Orders",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [460, 300],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "nuvemshop-credentials",
+          "name": "Nuvemshop API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const orders = $input.all()[0].json;\n\nif (!Array.isArray(orders) || orders.length === 0) {\n  return [{ json: { orders: [], metrics: null, skip: true } }];\n}\n\nconst paid = orders.filter(o => o.payment_status === 'paid' || o.payment_status === 'authorized');\n\nconst revenue = paid.reduce((sum, o) => sum + parseFloat(o.total || '0'), 0);\nconst avgTicket = paid.length > 0 ? revenue / paid.length : 0;\n\nconst pixOrders = paid.filter(o =>\n  (o.gateway || '').toLowerCase().includes('pix') ||\n  (o.payment_details?.method || '').toLowerCase().includes('pix')\n).length;\n\nconst cardOrders = paid.filter(o =>\n  (o.gateway || '').toLowerCase().includes('credit') ||\n  (o.payment_details?.method || '').toLowerCase().includes('credit_card')\n).length;\n\nconst couponUses = orders.filter(o => o.coupon && o.coupon.length > 0).length;\nconst conversionRate = orders.length > 0 ? (paid.length / orders.length) * 100 : 0;\n\nconst metrics = {\n  revenue_brl: Math.round(revenue * 100) / 100,\n  orders_count: paid.length,\n  avg_ticket_brl: Math.round(avgTicket * 100) / 100,\n  conversion_rate: Math.round(conversionRate * 100) / 100,\n  pix_orders: pixOrders,\n  card_orders: cardOrders,\n  coupon_uses: couponUses,\n  total_fetched: orders.length,\n  snapshot_at: new Date().toISOString()\n};\n\nreturn [{ json: { metrics, orders_count: orders.length } }];"
+      },
+      "id": "compute-metrics",
+      "name": "Compute Metrics",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "check-skip",
+              "leftValue": "={{ $json.metrics?.skip }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-has-data",
+      "name": "Has Data?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.BACKEND_URL || 'http://backend:3001' }}/api/metrics/sales",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "revenue_brl", "value": "={{ $('Compute Metrics').item.json.metrics.revenue_brl }}" },
+            { "name": "orders_count", "value": "={{ $('Compute Metrics').item.json.metrics.orders_count }}" },
+            { "name": "avg_ticket_brl", "value": "={{ $('Compute Metrics').item.json.metrics.avg_ticket_brl }}" },
+            { "name": "conversion_rate", "value": "={{ $('Compute Metrics').item.json.metrics.conversion_rate }}" },
+            { "name": "pix_orders", "value": "={{ $('Compute Metrics').item.json.metrics.pix_orders }}" },
+            { "name": "card_orders", "value": "={{ $('Compute Metrics').item.json.metrics.card_orders }}" },
+            { "name": "coupon_uses", "value": "={{ $('Compute Metrics').item.json.metrics.coupon_uses }}" }
+          ]
+        },
+        "options": { "timeout": 10000 }
+      },
+      "id": "save-metrics",
+      "name": "Save Metrics to Backend",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1120, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "const metrics = $('Compute Metrics').item.json.metrics;\n\n// Simple anomaly detection — compare to stored baseline\n// In production this baseline comes from DB / historical data\nconst BASELINE_CONVERSION = 1.9;\nconst BASELINE_REVENUE_PER_HOUR = 5000;\n\nconst anomalies = [];\n\nif (metrics.conversion_rate > 0 && metrics.conversion_rate < BASELINE_CONVERSION * 0.65) {\n  const drop = ((BASELINE_CONVERSION - metrics.conversion_rate) / BASELINE_CONVERSION * 100).toFixed(1);\n  anomalies.push({\n    severity: drop > 40 ? 'critical' : 'high',\n    module: 'Checkout',\n    title: `Conversão caiu ${drop}% abaixo da baseline`,\n    description: `Taxa de conversão atual ${metrics.conversion_rate}% vs baseline ${BASELINE_CONVERSION}%. Queda de ${drop}%.`,\n    source: 'nuvemshop'\n  });\n}\n\nreturn [{ json: { anomalies, has_anomaly: anomalies.length > 0, metrics } }];"
+      },
+      "id": "detect-anomaly",
+      "name": "Detect Anomaly",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1120, 380]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false },
+          "conditions": [
+            {
+              "id": "has-anomaly",
+              "leftValue": "={{ $json.has_anomaly }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "equals" }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "anomaly-detected",
+      "name": "Anomaly Detected?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1340, 380]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.BACKEND_URL || 'http://backend:3001' }}/api/alerts",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.anomalies[0]) }}",
+        "options": { "timeout": 10000 }
+      },
+      "id": "save-alert",
+      "name": "Save Alert",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1560, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.BACKEND_URL || 'http://backend:3001' }}/api/whatsapp/send-alert",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ severity: $('Detect Anomaly').item.json.anomalies[0].severity, module: $('Detect Anomaly').item.json.anomalies[0].module, title: $('Detect Anomaly').item.json.anomalies[0].title, description: $('Detect Anomaly').item.json.anomalies[0].description }) }}",
+        "options": { "timeout": 10000 }
+      },
+      "id": "send-whatsapp-alert",
+      "name": "Send WhatsApp Alert",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1560, 460]
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [{ "node": "Fetch Nuvemshop Orders", "type": "main", "index": 0 }]
+      ]
+    },
+    "Fetch Nuvemshop Orders": {
+      "main": [
+        [{ "node": "Compute Metrics", "type": "main", "index": 0 }]
+      ]
+    },
+    "Compute Metrics": {
+      "main": [
+        [{ "node": "Has Data?", "type": "main", "index": 0 }]
+      ]
+    },
+    "Has Data?": {
+      "main": [
+        [
+          { "node": "Save Metrics to Backend", "type": "main", "index": 0 },
+          { "node": "Detect Anomaly", "type": "main", "index": 0 }
+        ],
+        []
+      ]
+    },
+    "Detect Anomaly": {
+      "main": [
+        [{ "node": "Anomaly Detected?", "type": "main", "index": 0 }]
+      ]
+    },
+    "Anomaly Detected?": {
+      "main": [
+        [
+          { "node": "Save Alert", "type": "main", "index": 0 },
+          { "node": "Send WhatsApp Alert", "type": "main", "index": 0 }
+        ],
+        []
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveExecutionProgress": true,
+    "saveManualExecutions": true,
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "last",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "staticData": null,
+  "tags": [
+    { "name": "monitoring" },
+    { "name": "nuvemshop" }
+  ],
+  "triggerCount": 0,
+  "updatedAt": "2024-06-01T00:00:00.000Z",
+  "versionId": "v1"
+}
