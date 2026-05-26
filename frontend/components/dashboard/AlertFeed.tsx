@@ -43,10 +43,10 @@ const severityBg: Record<AlertSeverity, string> = {
 }
 
 const sourceColors: Record<string, string> = {
-  nuvemshop: 'text-blue-400',
-  instagram: 'text-purple-400',
-  monitoramento: 'text-cyan-400',
-  whatsapp: 'text-green-400',
+  nuvemshop: 'text-accent-dim',
+  instagram: 'text-accent',
+  monitoramento: 'text-low',
+  instagram_poll: 'text-accent',
   default: 'text-text-tertiary',
 }
 
@@ -71,13 +71,16 @@ function AlertItem({ alert, isLatest }: AlertItemProps) {
   return (
     <div
       className={clsx(
-        'group relative flex gap-3 px-3 py-3 border-l-2 rounded-r-lg transition-all duration-200',
+        'group relative flex gap-3 px-3 py-3 border-l-2 rounded-r-lg transition-ui',
         'border-b border-border/40 last:border-b-0',
         severityBorderLeft[alert.severity],
         severityBg[alert.severity],
         isLatest && 'animate-slide-in-right',
         alert.severity === 'critical' && alert.status !== 'resolved' && 'animate-glow-critical'
       )}
+      aria-live={alert.severity === 'critical' ? 'assertive' : undefined}
+      role="article"
+      aria-label={`Alerta ${alert.severity}: ${alert.title}`}
     >
       {/* Icon */}
       <div className="flex-shrink-0 mt-0.5">
@@ -210,8 +213,9 @@ export default function AlertFeed({ alerts }: AlertFeedProps) {
           <button
             key={key}
             onClick={() => setFilter(key)}
+            aria-pressed={filter === key}
             className={clsx(
-              'flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium transition-all whitespace-nowrap',
+              'flex items-center gap-1.5 px-3 py-2 rounded-md text-xs font-medium transition-ui whitespace-nowrap min-h-[44px] sm:min-h-[32px] sm:py-1.5',
               filter === key
                 ? 'bg-surface-3 text-text-primary border border-border-2'
                 : 'text-text-secondary hover:text-text-primary hover:bg-surface-2'
@@ -240,7 +244,12 @@ export default function AlertFeed({ alerts }: AlertFeedProps) {
             <p className="text-sm">Nenhum alerta {filter !== 'all' ? `"${filter}"` : ''}</p>
           </div>
         ) : (
-          <div className="divide-y divide-transparent">
+          <div
+            className="divide-y divide-transparent"
+            aria-live="polite"
+            aria-label="Feed de alertas operacionais"
+            role="log"
+          >
             {filteredAlerts.map((alert) => (
               <AlertItem
                 key={alert.id}

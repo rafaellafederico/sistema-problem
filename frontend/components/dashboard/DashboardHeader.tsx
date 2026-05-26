@@ -1,8 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
 import { format } from 'date-fns'
-import { ptBR } from 'date-fns/locale'
+import LiveClock from '@/components/ui/LiveClock'
 
 interface DashboardHeaderProps {
   lastSync: Date
@@ -10,27 +9,16 @@ interface DashboardHeaderProps {
 }
 
 export default function DashboardHeader({ lastSync, isOnline }: DashboardHeaderProps) {
-  const [currentTime, setCurrentTime] = useState<Date>(new Date())
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentTime(new Date())
-    }, 1000)
-    return () => clearInterval(timer)
-  }, [])
-
-  const formattedDate = format(currentTime, "EEEE, dd 'de' MMMM", { locale: ptBR })
-  const formattedTime = format(currentTime, 'HH:mm:ss')
   const syncTime = format(lastSync, 'HH:mm:ss')
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border bg-surface/90 backdrop-blur-md">
       <div className="max-w-[1920px] mx-auto px-4 md:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
+
           {/* Left: Logo + Title */}
           <div className="flex items-center gap-4">
-            {/* SG Monogram */}
-            <div className="relative flex items-center justify-center w-9 h-9 rounded-lg bg-gradient-to-br from-accent to-accent-dim shadow-sm">
+            <div className="relative flex items-center justify-center w-9 h-9 rounded-lg bg-accent shadow-sm">
               <span className="text-background font-bold text-sm tracking-tight select-none">
                 SG
               </span>
@@ -45,10 +33,8 @@ export default function DashboardHeader({ lastSync, isOnline }: DashboardHeaderP
               </span>
             </div>
 
-            {/* Divider */}
             <div className="hidden md:block h-6 w-px bg-border mx-1" />
 
-            {/* System Status */}
             <div className="hidden md:flex items-center gap-2">
               <div className="relative flex items-center justify-center w-2 h-2">
                 <span
@@ -70,7 +56,6 @@ export default function DashboardHeader({ lastSync, isOnline }: DashboardHeaderP
 
           {/* Right: Clock + Sync */}
           <div className="flex items-center gap-6">
-            {/* Last Sync */}
             <div className="hidden sm:flex flex-col items-end">
               <span className="text-xs text-text-tertiary uppercase tracking-wider font-medium">
                 Última Sincronização
@@ -78,20 +63,10 @@ export default function DashboardHeader({ lastSync, isOnline }: DashboardHeaderP
               <span className="text-xs font-mono text-text-secondary">{syncTime}</span>
             </div>
 
-            {/* Divider */}
             <div className="hidden sm:block h-6 w-px bg-border" />
 
-            {/* Live Clock */}
-            <div className="flex flex-col items-end">
-              <span className="font-mono text-text-primary font-medium text-base tabular-nums tracking-tight">
-                {formattedTime}
-              </span>
-              <span className="text-xs text-text-secondary capitalize hidden sm:block">
-                {formattedDate}
-              </span>
-            </div>
+            <LiveClock />
 
-            {/* Live Badge */}
             <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-low/30 bg-low-bg">
               <span className="w-1.5 h-1.5 rounded-full bg-low animate-pulse" />
               <span className="text-low text-xs font-semibold tracking-wider uppercase">
@@ -99,6 +74,7 @@ export default function DashboardHeader({ lastSync, isOnline }: DashboardHeaderP
               </span>
             </div>
           </div>
+
         </div>
       </div>
     </header>

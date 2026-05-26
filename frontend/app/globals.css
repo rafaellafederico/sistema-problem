@@ -53,40 +53,16 @@ body {
   scrollbar-color: #333333 #111111;
 }
 
-/* Smooth transitions */
-* {
+/* Smooth transitions — aplicar só em elementos interativos, não em * */
+.transition-ui {
   transition-property: color, background-color, border-color, opacity;
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
   transition-duration: 150ms;
 }
 
-/* Prevent transition on layout */
-.no-transition {
-  transition: none !important;
-}
-
-/* Glass effect */
-.glass {
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  background: rgba(17, 17, 17, 0.8);
-}
-
 /* Glow effects */
-.glow-accent {
-  box-shadow: 0 0 20px rgba(245, 230, 208, 0.1);
-}
-
 .glow-critical {
   box-shadow: 0 0 8px rgba(239, 68, 68, 0.4);
-}
-
-/* Text gradient */
-.text-gradient-accent {
-  background: linear-gradient(135deg, #f5e6d0, #c9b99a);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
 }
 
 /* Chart tooltip dark override */

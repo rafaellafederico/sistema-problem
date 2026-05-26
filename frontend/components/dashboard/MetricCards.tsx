@@ -58,7 +58,7 @@ function MetricCard({ card }: { card: MetricCardData }) {
   return (
     <div
       className={clsx(
-        'relative flex flex-col gap-3 p-4 rounded-xl border bg-surface transition-all duration-200',
+        'relative flex flex-col gap-3 p-4 rounded-xl border bg-surface transition-ui',
         'hover:bg-surface-2 cursor-default group',
         cardBorderColor,
         isNegative && 'animate-glow-critical'
