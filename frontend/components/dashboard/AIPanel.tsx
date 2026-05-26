@@ -191,7 +191,7 @@ export default function AIPanel({ insights }: AIPanelProps) {
         <div className="flex items-center gap-2">
           <div className="relative">
             <Brain className="w-4 h-4 text-accent" />
-            <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-low animate-pulse" />
+            <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-low" />
           </div>
           <span className="text-sm font-semibold text-text-primary">IA Operacional</span>
         </div>

@@ -28,18 +28,18 @@ const severityIcons: Record<AlertSeverity, React.ComponentType<{ className?: str
   low: CheckCircle2,
 }
 
-const severityBorderLeft: Record<AlertSeverity, string> = {
-  critical: 'border-l-critical',
-  high: 'border-l-high',
-  medium: 'border-l-medium',
-  low: 'border-l-low',
+const severityStaticBg: Record<AlertSeverity, string> = {
+  critical: 'bg-critical-bg/10',
+  high: '',
+  medium: '',
+  low: '',
 }
 
-const severityBg: Record<AlertSeverity, string> = {
-  critical: 'hover:bg-critical-bg/30',
-  high: 'hover:bg-high-bg/50',
-  medium: 'hover:bg-medium-bg/50',
-  low: 'hover:bg-low-bg/50',
+const severityHoverBg: Record<AlertSeverity, string> = {
+  critical: 'hover:bg-critical-bg/20',
+  high: 'hover:bg-high-bg/15',
+  medium: 'hover:bg-medium-bg/15',
+  low: 'hover:bg-low-bg/10',
 }
 
 const sourceColors: Record<string, string> = {
@@ -71,10 +71,10 @@ function AlertItem({ alert, isLatest }: AlertItemProps) {
   return (
     <div
       className={clsx(
-        'group relative flex gap-3 px-3 py-3 border-l-2 rounded-r-lg transition-ui',
-        'border-b border-border/40 last:border-b-0',
-        severityBorderLeft[alert.severity],
-        severityBg[alert.severity],
+        'group relative flex gap-3 px-3 py-3 rounded-lg transition-ui',
+        'border border-border/30 mb-1.5 last:mb-0',
+        severityStaticBg[alert.severity],
+        severityHoverBg[alert.severity],
         isLatest && 'animate-slide-in-right',
         alert.severity === 'critical' && alert.status !== 'resolved' && 'animate-glow-critical'
       )}
@@ -197,7 +197,7 @@ export default function AlertFeed({ alerts }: AlertFeedProps) {
           <Bell className="w-4 h-4 text-accent" />
           <span className="text-sm font-semibold text-text-primary">Feed de Alertas</span>
           {counts.critical > 0 && (
-            <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-critical text-white text-[10px] font-bold">
+            <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-critical-bg border border-critical/30 text-critical text-[10px] font-semibold">
               {counts.critical}
             </span>
           )}
@@ -245,7 +245,7 @@ export default function AlertFeed({ alerts }: AlertFeedProps) {
           </div>
         ) : (
           <div
-            className="divide-y divide-transparent"
+            className="px-3 py-2"
             aria-live="polite"
             aria-label="Feed de alertas operacionais"
             role="log"

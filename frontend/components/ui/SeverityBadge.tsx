@@ -34,7 +34,7 @@ export default function SeverityBadge({ severity, size = 'sm' }: SeverityBadgePr
   return (
     <span
       className={clsx(
-        'inline-flex items-center rounded border font-bold uppercase tracking-widest',
+        'inline-flex items-center rounded border font-semibold uppercase tracking-wider',
         size === 'sm' ? 'px-1.5 py-0.5 text-[9px]' : 'px-2 py-1 text-[10px]',
         config.classes
       )}

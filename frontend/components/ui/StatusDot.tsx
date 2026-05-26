@@ -34,7 +34,7 @@ export default function StatusDot({ status, showLabel = false, size = 'sm' }: St
   return (
     <div className="flex items-center gap-1.5">
       <div className="relative flex items-center justify-center">
-        {status !== 'offline' && (
+        {status === 'degraded' && (
           <span
             className={clsx(
               'absolute inline-flex rounded-full opacity-75',

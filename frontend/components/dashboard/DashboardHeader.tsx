@@ -37,11 +37,9 @@ export default function DashboardHeader({ lastSync, isOnline }: DashboardHeaderP
 
             <div className="hidden md:flex items-center gap-2">
               <div className="relative flex items-center justify-center w-2 h-2">
-                <span
-                  className={`absolute inline-flex h-full w-full rounded-full opacity-75 animate-ping ${
-                    isOnline ? 'bg-low' : 'bg-critical'
-                  }`}
-                />
+                {!isOnline && (
+                  <span className="absolute inline-flex h-full w-full rounded-full opacity-75 animate-ping bg-critical" />
+                )}
                 <span
                   className={`relative inline-flex rounded-full h-2 w-2 ${
                     isOnline ? 'bg-low' : 'bg-critical'
@@ -68,7 +66,7 @@ export default function DashboardHeader({ lastSync, isOnline }: DashboardHeaderP
             <LiveClock />
 
             <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-low/30 bg-low-bg">
-              <span className="w-1.5 h-1.5 rounded-full bg-low animate-pulse" />
+              <span className="w-1.5 h-1.5 rounded-full bg-low" />
               <span className="text-low text-xs font-semibold tracking-wider uppercase">
                 Ao Vivo
               </span>
