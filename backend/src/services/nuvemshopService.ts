@@ -126,9 +126,8 @@ class NuvemshopService {
           )
         : now.toISOString()
 
-    const paidOrders = orders.filter(
-      (o) => o.payment_status === 'paid' || o.payment_status === 'authorized'
-    )
+    // Only count fully settled payments (matches Nuvemshop "Vendas totais")
+    const paidOrders = orders.filter((o) => o.payment_status === 'paid')
     const cancelledOrders = orders.filter((o) => o.status === 'cancelled')
     const refundedOrders = orders.filter((o) => o.payment_status === 'refunded')
 
@@ -325,9 +324,8 @@ class NuvemshopService {
   }> {
     const buckets: Record<string, { pix: number; card: number; boleto: number; total: number }> = {}
 
-    const paidOrders = orders.filter(
-      (o) => o.payment_status === 'paid' || o.payment_status === 'authorized'
-    )
+    // Only count fully settled payments (matches Nuvemshop "Vendas totais")
+    const paidOrders = orders.filter((o) => o.payment_status === 'paid')
 
     for (const order of paidOrders) {
       const date = new Date(order.created_at)

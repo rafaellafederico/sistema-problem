@@ -4,6 +4,15 @@ import nuvemshopService from '../services/nuvemshopService'
 
 const router = Router()
 
+// Brazil is UTC-3, no DST since 2019. Today starts at 03:00 UTC.
+function getBrazilMidnightUTC(): Date {
+  const now = new Date()
+  const d = new Date(now)
+  d.setUTCHours(3, 0, 0, 0)
+  if (now.getUTCHours() < 3) d.setUTCDate(d.getUTCDate() - 1)
+  return d
+}
+
 // GET /api/metrics/sales
 // ?type=hourly  → { data: HourlySalesPoint[] }
 // default       → { metrics: { revenue_brl, orders_count, avg_ticket_brl, pix_orders, card_orders, coupon_uses } }
@@ -43,9 +52,7 @@ router.get('/sales', async (req: Request, res: Response) => {
     if (history.length === 0 && process.env.NUVEMSHOP_STORE_ID && process.env.NUVEMSHOP_ACCESS_TOKEN) {
       try {
         console.log('[MetricsRoute] Supabase empty — fetching live from Nuvemshop')
-        const todayMidnight = new Date()
-        todayMidnight.setHours(0, 0, 0, 0)
-        const orders = await nuvemshopService.fetchOrders(todayMidnight)
+        const orders = await nuvemshopService.fetchOrders(getBrazilMidnightUTC())
         const live = nuvemshopService.computeMetrics(orders)
         return res.json({
           metrics: {

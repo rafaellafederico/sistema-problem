@@ -9,6 +9,18 @@ import anomalyDetector from './anomalyDetector'
 
 const SITE_URL = process.env.SITE_URL || 'https://www.saintgermain.com.br'
 
+// Returns midnight of "today" in Brazil time (UTC-3) as a UTC Date object
+function getBrazilMidnightUTC(): Date {
+  const nowUTC = new Date()
+  // Brazil is UTC-3 (no DST since 2019). Day starts at 03:00 UTC.
+  const d = new Date(nowUTC)
+  d.setUTCHours(3, 0, 0, 0)
+  if (nowUTC.getUTCHours() < 3) {
+    d.setUTCDate(d.getUTCDate() - 1)
+  }
+  return d
+}
+
 let lastKnownMetrics: NuvemshopMetrics | null = null
 let siteWasOffline = false
 
@@ -16,9 +28,8 @@ async function fetchAndAnalyzeMetrics(): Promise<void> {
   try {
     console.log('[MetricsWorker] Fetching Nuvemshop metrics...')
 
-    // Always fetch from midnight today so revenue/orders reflect the full day
-    const todayMidnight = new Date()
-    todayMidnight.setHours(0, 0, 0, 0)
+    // Fetch from midnight Brazil time (UTC-3) — matches Nuvemshop "today"
+    const todayMidnight = getBrazilMidnightUTC()
     const orders = await nuvemshopService.fetchOrders(todayMidnight)
     const currentMetrics = nuvemshopService.computeMetrics(orders)
 
