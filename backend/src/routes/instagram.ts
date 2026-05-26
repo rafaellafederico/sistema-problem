@@ -134,7 +134,7 @@ async function checkInstabilitySpike(): Promise<void> {
         (a) =>
           a.module === 'Instagram' &&
           a.title.includes('Spike') &&
-          new Date(a.created_at).getTime() > Date.now() - 30 * 60 * 1000
+          new Date(a.created_at ?? 0).getTime() > Date.now() - 30 * 60 * 1000
       )
 
       if (!alreadyAlerted) {
