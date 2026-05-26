@@ -43,8 +43,9 @@ router.get('/sales', async (req: Request, res: Response) => {
     if (history.length === 0 && process.env.NUVEMSHOP_STORE_ID && process.env.NUVEMSHOP_ACCESS_TOKEN) {
       try {
         console.log('[MetricsRoute] Supabase empty — fetching live from Nuvemshop')
-        const since = new Date(Date.now() - 24 * 60 * 60 * 1000)
-        const orders = await nuvemshopService.fetchOrders(since)
+        const todayMidnight = new Date()
+        todayMidnight.setHours(0, 0, 0, 0)
+        const orders = await nuvemshopService.fetchOrders(todayMidnight)
         const live = nuvemshopService.computeMetrics(orders)
         return res.json({
           metrics: {

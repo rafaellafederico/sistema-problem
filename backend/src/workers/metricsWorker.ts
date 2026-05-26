@@ -16,8 +16,10 @@ async function fetchAndAnalyzeMetrics(): Promise<void> {
   try {
     console.log('[MetricsWorker] Fetching Nuvemshop metrics...')
 
-    const since = new Date(Date.now() - 2 * 60 * 60 * 1000) // last 2 hours
-    const orders = await nuvemshopService.fetchOrders(since)
+    // Always fetch from midnight today so revenue/orders reflect the full day
+    const todayMidnight = new Date()
+    todayMidnight.setHours(0, 0, 0, 0)
+    const orders = await nuvemshopService.fetchOrders(todayMidnight)
     const currentMetrics = nuvemshopService.computeMetrics(orders)
 
     // Hourly payment mix analysis
