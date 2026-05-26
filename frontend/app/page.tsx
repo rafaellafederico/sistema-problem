@@ -103,7 +103,7 @@ export default function DashboardPage() {
               ? {
                   ...card,
                   value: `${(site.uptime_percent ?? 100).toFixed(2)}%`,
-                  status: site.status === 'online' ? 'online' : site.status === 'degraded' ? 'warning' : 'offline',
+                  status: site.status === 'online' ? 'online' : site.status === 'degraded' ? 'degraded' : 'offline',
                 }
               : card
           )
