@@ -64,7 +64,7 @@ export default function DashboardPage() {
       apiFetch<{ health: Array<{ service: string; status: string; uptime_percent: number }> }>('/api/metrics/system'),
       apiFetch<{ data: HourlySalesPoint[] }>('/api/metrics/sales?type=hourly'),
       apiFetch<{ insights: AIInsight[] }>('/api/ai/insights'),
-      apiFetch<{ alerts: Alert[] }>('/api/alerts?limit=10&status=resolved,investigating,open'),
+      apiFetch<{ alerts: Alert[] }>('/api/alerts?limit=30&status=resolved,investigating'),
     ])
 
     // ── Alertas ────────────────────────────────────────────────────────────
@@ -85,9 +85,9 @@ export default function DashboardPage() {
               return { ...card, value: `R$ ${Number(m.revenue_brl ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` }
             case 'orders':
               return { ...card, value: String(m.orders_count ?? card.value) }
-            case 'avg_ticket':
+            case 'ticket':
               return { ...card, value: `R$ ${Number(m.avg_ticket_brl ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` }
-            case 'pix':
+            case 'pix_orders':
               return { ...card, value: String(m.pix_orders ?? card.value) }
             case 'coupons':
               return { ...card, value: String(m.coupon_uses ?? card.value) }
