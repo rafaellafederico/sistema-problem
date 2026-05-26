@@ -98,7 +98,7 @@ function InsightCard({ insight }: { insight: AIInsight }) {
             </span>
             <span className="text-[10px] text-text-tertiary">{timeAgo}</span>
           </div>
-          <p className="text-xs font-semibold text-text-primary leading-snug">
+          <p className="text-xs font-semibold text-text-primary leading-snug line-clamp-2">
             {insight.title}
           </p>
           <div className="mt-2">
@@ -225,6 +225,16 @@ export default function AIPanel({ insights }: AIPanelProps) {
       <div className="flex-1 overflow-y-auto min-h-0 px-4 pb-3 space-y-2">
         {isGenerating ? (
           <LoadingSkeleton />
+        ) : currentInsights.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-full gap-3 py-10 text-center">
+            <Brain className="w-8 h-8 text-text-tertiary opacity-30" />
+            <div>
+              <p className="text-xs font-medium text-text-secondary">Nenhum insight gerado</p>
+              <p className="text-[11px] text-text-tertiary mt-1 leading-relaxed">
+                Clique em "Gerar Nova Análise" para que a IA analise os alertas ativos.
+              </p>
+            </div>
+          </div>
         ) : (
           currentInsights.map((insight) => (
             <InsightCard key={insight.id} insight={insight} />

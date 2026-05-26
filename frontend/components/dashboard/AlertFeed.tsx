@@ -114,7 +114,7 @@ function AlertItem({ alert, isLatest }: AlertItemProps) {
         </div>
 
         {/* Title */}
-        <p className="text-xs font-semibold text-text-primary leading-snug mb-1">
+        <p className="text-xs font-semibold text-text-primary leading-snug mb-1 line-clamp-2">
           {alert.title}
         </p>
 

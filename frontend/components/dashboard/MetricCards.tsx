@@ -82,16 +82,17 @@ function MetricCard({ card }: { card: MetricCardData }) {
       </div>
 
       {/* Value */}
-      <div className="flex flex-col gap-0.5">
+      <div className="flex flex-col gap-0.5 min-w-0">
         <span
           className={clsx(
-            'text-2xl font-bold tabular-nums tracking-tight leading-none',
+            'text-2xl font-bold tabular-nums tracking-tight leading-none truncate',
             isNegative ? 'text-white' : 'text-text-primary'
           )}
+          title={card.value}
         >
           {card.value}
         </span>
-        <span className="text-xs font-medium text-text-secondary uppercase tracking-wider">
+        <span className="text-xs font-medium text-text-secondary uppercase tracking-wider truncate">
           {card.label}
         </span>
       </div>

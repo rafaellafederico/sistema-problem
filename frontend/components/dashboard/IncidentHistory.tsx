@@ -116,10 +116,13 @@ export default function IncidentHistory({ incidents }: IncidentHistoryProps) {
 
       {/* Table */}
       <div className="flex-1 overflow-auto min-h-0">
-        <table className="w-full text-xs">
+        <table className="w-full text-xs" aria-label="Histórico de incidentes operacionais">
           <thead className="sticky top-0 bg-surface-2 z-10">
             <tr className="border-b border-border">
-              <th className="px-4 py-2.5 text-left">
+              <th
+                className="px-4 py-2.5 text-left"
+                aria-sort={sortField === 'severity' ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}
+              >
                 <button
                   className="flex items-center gap-1 text-text-secondary font-semibold uppercase tracking-wider hover:text-text-primary transition-colors"
                   onClick={() => handleSort('severity')}
@@ -128,7 +131,10 @@ export default function IncidentHistory({ incidents }: IncidentHistoryProps) {
                   <SortIcon field="severity" currentField={sortField} direction={sortDir} />
                 </button>
               </th>
-              <th className="px-4 py-2.5 text-left">
+              <th
+                className="px-4 py-2.5 text-left"
+                aria-sort={sortField === 'module' ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}
+              >
                 <button
                   className="flex items-center gap-1 text-text-secondary font-semibold uppercase tracking-wider hover:text-text-primary transition-colors"
                   onClick={() => handleSort('module')}
@@ -140,7 +146,10 @@ export default function IncidentHistory({ incidents }: IncidentHistoryProps) {
               <th className="px-4 py-2.5 text-left text-text-secondary font-semibold uppercase tracking-wider">
                 Descrição
               </th>
-              <th className="px-4 py-2.5 text-left">
+              <th
+                className="px-4 py-2.5 text-left"
+                aria-sort={sortField === 'start_time' ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}
+              >
                 <button
                   className="flex items-center gap-1 text-text-secondary font-semibold uppercase tracking-wider hover:text-text-primary transition-colors"
                   onClick={() => handleSort('start_time')}
@@ -152,7 +161,10 @@ export default function IncidentHistory({ incidents }: IncidentHistoryProps) {
               <th className="px-4 py-2.5 text-left text-text-secondary font-semibold uppercase tracking-wider">
                 Resolução
               </th>
-              <th className="px-4 py-2.5 text-left">
+              <th
+                className="px-4 py-2.5 text-left"
+                aria-sort={sortField === 'status' ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}
+              >
                 <button
                   className="flex items-center gap-1 text-text-secondary font-semibold uppercase tracking-wider hover:text-text-primary transition-colors"
                   onClick={() => handleSort('status')}

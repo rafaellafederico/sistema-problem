@@ -157,6 +157,8 @@ export default function SalesChart({ data }: SalesChartProps) {
           <AreaChart
             data={slicedData}
             margin={{ top: 4, right: 8, left: 0, bottom: 0 }}
+            role="img"
+            aria-label={`Gráfico de faturamento por hora. Hoje: ${formatBRL(todayTotal)}${yesterdayTotal > 0 ? `, variação de ${changePercent >= 0 ? '+' : ''}${changePercent.toFixed(1)}% vs ontem` : ''}`}
           >
             <defs>
               <linearGradient id="gradientToday" x1="0" y1="0" x2="0" y2="1">
