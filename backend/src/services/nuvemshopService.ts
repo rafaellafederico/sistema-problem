@@ -241,7 +241,125 @@ class NuvemshopService {
       }
     }
 
+    // Payment method shift detection
+    const totalCurrent = current.pix_orders + current.card_orders + current.boleto_orders
+    const totalHistorical = historical.pix_orders + historical.card_orders + historical.boleto_orders
+
+    if (totalCurrent >= 3 && totalHistorical >= 3) {
+      const currentPixPct = (current.pix_orders / totalCurrent) * 100
+      const currentCardPct = (current.card_orders / totalCurrent) * 100
+      const historicalPixPct = (historical.pix_orders / totalHistorical) * 100
+      const historicalCardPct = (historical.card_orders / totalHistorical) * 100
+
+      const pixShift = currentPixPct - historicalPixPct
+      const cardShift = currentCardPct - historicalCardPct
+
+      // PIX growing fast while card drops → possible card gateway issue
+      if (pixShift >= 20 && cardShift <= -15) {
+        anomalies.push({
+          detected: true,
+          type: 'payment_shift_pix_surge',
+          metric: 'pix_orders',
+          current_value: currentPixPct,
+          baseline_value: historicalPixPct,
+          deviation_percent: pixShift,
+          severity: pixShift >= 35 ? 'high' : 'medium',
+          description: `Mix de pagamento mudou: PIX subiu ${pixShift.toFixed(0)}pp (de ${historicalPixPct.toFixed(0)}% → ${currentPixPct.toFixed(0)}%), cartão caiu ${Math.abs(cardShift).toFixed(0)}pp (de ${historicalCardPct.toFixed(0)}% → ${currentCardPct.toFixed(0)}%). Possível problema no gateway de cartão.`,
+        })
+      }
+
+      // Card growing fast while PIX drops → unusual, flag it
+      if (cardShift >= 20 && pixShift <= -15) {
+        anomalies.push({
+          detected: true,
+          type: 'payment_shift_card_surge',
+          metric: 'card_orders',
+          current_value: currentCardPct,
+          baseline_value: historicalCardPct,
+          deviation_percent: cardShift,
+          severity: 'medium',
+          description: `Mix de pagamento mudou: cartão subiu ${cardShift.toFixed(0)}pp (de ${historicalCardPct.toFixed(0)}% → ${currentCardPct.toFixed(0)}%), PIX caiu ${Math.abs(pixShift).toFixed(0)}pp. Verificar se há problema no fluxo de PIX.`,
+        })
+      }
+
+      // Any single method completely disappearing
+      if (historicalCardPct >= 10 && currentCardPct === 0 && totalCurrent >= 5) {
+        anomalies.push({
+          detected: true,
+          type: 'payment_method_down',
+          metric: 'card_orders',
+          current_value: 0,
+          baseline_value: historicalCardPct,
+          deviation_percent: 100,
+          severity: 'critical',
+          description: `Pagamento por cartão zerou nos últimos ${totalCurrent} pedidos. Era ${historicalCardPct.toFixed(0)}% do mix. Gateway de cartão pode estar fora do ar.`,
+        })
+      }
+
+      if (historicalPixPct >= 10 && currentPixPct === 0 && totalCurrent >= 5) {
+        anomalies.push({
+          detected: true,
+          type: 'payment_method_down',
+          metric: 'pix_orders',
+          current_value: 0,
+          baseline_value: historicalPixPct,
+          deviation_percent: 100,
+          severity: 'critical',
+          description: `Pagamento por PIX zerou nos últimos ${totalCurrent} pedidos. Era ${historicalPixPct.toFixed(0)}% do mix. Verificar integração PIX.`,
+        })
+      }
+    }
+
     return anomalies
+  }
+
+  // Break orders into hourly buckets for payment method analysis
+  computeHourlyPaymentMix(orders: NuvemshopOrder[]): Array<{
+    hour: string
+    pix: number
+    card: number
+    boleto: number
+    total: number
+    pix_pct: number
+    card_pct: number
+  }> {
+    const buckets: Record<string, { pix: number; card: number; boleto: number; total: number }> = {}
+
+    const paidOrders = orders.filter(
+      (o) => o.payment_status === 'paid' || o.payment_status === 'authorized'
+    )
+
+    for (const order of paidOrders) {
+      const date = new Date(order.created_at)
+      const hour = `${String(date.getHours()).padStart(2, '0')}:00`
+      if (!buckets[hour]) buckets[hour] = { pix: 0, card: 0, boleto: 0, total: 0 }
+
+      const isPix =
+        order.gateway?.toLowerCase().includes('pix') ||
+        order.payment_details?.method?.toLowerCase().includes('pix')
+      const isCard =
+        order.gateway?.toLowerCase().includes('credit') ||
+        order.gateway?.toLowerCase().includes('card') ||
+        order.payment_details?.method?.toLowerCase().includes('credit_card')
+      const isBoleto =
+        order.gateway?.toLowerCase().includes('boleto') ||
+        order.payment_details?.method?.toLowerCase().includes('boleto')
+
+      if (isPix) buckets[hour].pix++
+      else if (isCard) buckets[hour].card++
+      else if (isBoleto) buckets[hour].boleto++
+
+      buckets[hour].total++
+    }
+
+    return Object.entries(buckets)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([hour, v]) => ({
+        hour,
+        ...v,
+        pix_pct: v.total > 0 ? Math.round((v.pix / v.total) * 100) : 0,
+        card_pct: v.total > 0 ? Math.round((v.card / v.total) * 100) : 0,
+      }))
   }
 
   setBaseline(metrics: NuvemshopMetrics): void {

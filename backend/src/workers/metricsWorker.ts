@@ -20,6 +20,15 @@ async function fetchAndAnalyzeMetrics(): Promise<void> {
     const orders = await nuvemshopService.fetchOrders(since)
     const currentMetrics = nuvemshopService.computeMetrics(orders)
 
+    // Hourly payment mix analysis
+    const hourlyMix = nuvemshopService.computeHourlyPaymentMix(orders)
+    if (hourlyMix.length > 0) {
+      const latest = hourlyMix[hourlyMix.length - 1]
+      console.log(
+        `[MetricsWorker] Payment mix (${latest.hour}): PIX ${latest.pix_pct}% | Card ${latest.card_pct}% | total ${latest.total}`
+      )
+    }
+
     // Save to DB
     await supabaseService.saveSalesMetric({
       revenue_brl: currentMetrics.revenue_brl,
@@ -32,7 +41,7 @@ async function fetchAndAnalyzeMetrics(): Promise<void> {
       coupon_uses: currentMetrics.coupon_uses,
     })
 
-    // Detect anomalies vs last snapshot
+    // Detect anomalies vs last snapshot (includes payment method shift)
     if (lastKnownMetrics) {
       const anomalies = nuvemshopService.detectAnomalies(currentMetrics, lastKnownMetrics)
 

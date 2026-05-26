@@ -177,13 +177,28 @@ router.post('/sales', async (req: Request, res: Response) => {
   }
 })
 
+// GET /api/metrics/payments/hourly - hourly payment method breakdown
+// Returns per-hour PIX vs card vs boleto counts and percentages (last 24h)
+router.get('/payments/hourly', async (_req: Request, res: Response) => {
+  try {
+    const since = new Date(Date.now() - 24 * 60 * 60 * 1000)
+    const orders = await nuvemshopService.fetchOrders(since)
+    const hourlyMix = nuvemshopService.computeHourlyPaymentMix(orders)
+    res.json({ data: hourlyMix, orders_analyzed: orders.length })
+  } catch (error) {
+    console.error('[MetricsRoute] Error fetching hourly payment mix:', error)
+    res.status(500).json({ error: 'Failed to fetch payment mix' })
+  }
+})
+
 // GET /api/metrics/nuvemshop/live - fetch live from Nuvemshop (debug/admin)
 router.get('/nuvemshop/live', async (_req: Request, res: Response) => {
   try {
     const since = new Date(Date.now() - 24 * 60 * 60 * 1000)
     const orders = await nuvemshopService.fetchOrders(since)
     const metrics = nuvemshopService.computeMetrics(orders)
-    res.json({ metrics, orders_fetched: orders.length })
+    const hourlyMix = nuvemshopService.computeHourlyPaymentMix(orders)
+    res.json({ metrics, hourly_payment_mix: hourlyMix, orders_fetched: orders.length })
   } catch (error) {
     console.error('[MetricsRoute] Error fetching live Nuvemshop metrics:', error)
     res.status(500).json({ error: 'Failed to fetch Nuvemshop metrics' })
