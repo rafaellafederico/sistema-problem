@@ -28,16 +28,20 @@ app.use(
 )
 
 // ─── CORS ───────────────────────────────────────────────────────────────────
-const allowedOrigins = [
-  'http://localhost:3000',
-  'http://localhost:3001',
-  process.env.FRONTEND_URL || '',
-].filter(Boolean)
+function isOriginAllowed(origin: string | undefined): boolean {
+  if (!origin) return true
+  if (origin.startsWith('http://localhost')) return true
+  if (origin.endsWith('.vercel.app')) return true
+  if (origin.endsWith('.onrender.com')) return true
+  const frontendUrl = process.env.FRONTEND_URL
+  if (frontendUrl && origin === frontendUrl) return true
+  return false
+}
 
 app.use(
   cors({
     origin: (origin, callback) => {
-      if (!origin || allowedOrigins.includes(origin)) {
+      if (isOriginAllowed(origin)) {
         callback(null, true)
       } else {
         callback(new Error(`CORS: ${origin} not allowed`))
