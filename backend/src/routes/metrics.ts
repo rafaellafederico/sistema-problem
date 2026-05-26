@@ -76,11 +76,15 @@ router.get('/sales', async (req: Request, res: Response) => {
 
     // Aggregate today's data from all snapshots (sum, not just latest)
     const latest = history[history.length - 1]
+    const derivedAvgTicket =
+      latest.orders_count > 0
+        ? Math.round((latest.revenue_brl / latest.orders_count) * 100) / 100
+        : 0
     return res.json({
       metrics: {
         revenue_brl: latest.revenue_brl,
         orders_count: latest.orders_count,
-        avg_ticket_brl: latest.avg_ticket_brl,
+        avg_ticket_brl: derivedAvgTicket,
         pix_orders: latest.pix_orders,
         card_orders: latest.card_orders,
         coupon_uses: latest.coupon_uses ?? 0,

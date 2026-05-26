@@ -14,9 +14,19 @@ import {
   mockAIInsights,
   mockIncidents,
 } from '@/lib/mockData'
-import { Alert, AIInsight, HourlySalesPoint, IncidentRecord, MetricCardData } from '@/lib/types'
+import { Alert, AIInsight, AlertSeverity, HourlySalesPoint, IncidentRecord, MetricCardData } from '@/lib/types'
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
+
+function computeIncidentDuration(start: string, end: string): string {
+  const ms = new Date(end).getTime() - new Date(start).getTime()
+  if (ms <= 0) return ''
+  const totalMins = Math.round(ms / 60000)
+  if (totalMins < 60) return `${totalMins}min`
+  const h = Math.floor(totalMins / 60)
+  const m = totalMins % 60
+  return m > 0 ? `${h}h ${m}min` : `${h}h`
+}
 
 async function apiFetch<T>(path: string): Promise<T | null> {
   try {
@@ -54,12 +64,13 @@ export default function DashboardPage() {
       apiFetch<{ health: Array<{ service: string; status: string; uptime_percent: number }> }>('/api/metrics/system'),
       apiFetch<{ data: HourlySalesPoint[] }>('/api/metrics/sales?type=hourly'),
       apiFetch<{ insights: AIInsight[] }>('/api/ai/insights'),
-      apiFetch<{ alerts: IncidentRecord[] }>('/api/alerts?limit=10&status=resolved,investigating,open'),
+      apiFetch<{ alerts: Alert[] }>('/api/alerts?limit=10&status=resolved,investigating,open'),
     ])
 
     // ── Alertas ────────────────────────────────────────────────────────────
-    if (alertsData?.alerts?.length) {
-      setAlerts(alertsData.alerts)
+    // Clear mock as soon as API responds — even an empty list is real data
+    if (alertsData !== null) {
+      setAlerts(alertsData.alerts ?? [])
       setUsingMock(false)
     }
 
@@ -123,13 +134,30 @@ export default function DashboardPage() {
     }
 
     // ── Insights de IA ────────────────────────────────────────────────────
-    if (insightsData?.insights?.length) {
-      setAIInsights(insightsData.insights)
+    if (insightsData !== null) {
+      setAIInsights(insightsData.insights ?? [])
     }
 
     // ── Histórico de incidentes ────────────────────────────────────────────
-    if (incidentsData?.alerts?.length) {
-      setIncidents(incidentsData.alerts as unknown as IncidentRecord[])
+    // API returns Alert[] — map to IncidentRecord (field names differ)
+    if (incidentsData !== null) {
+      setIncidents(
+        (incidentsData.alerts ?? []).map((a): IncidentRecord => ({
+          id: a.id,
+          severity: a.severity,
+          module: a.module,
+          description: a.description,
+          start_time: a.created_at,
+          end_time: a.resolved_at,
+          status:
+            a.status === 'resolved' ? 'resolved'
+            : a.status === 'investigating' ? 'investigating'
+            : 'ongoing',
+          duration: a.resolved_at
+            ? computeIncidentDuration(a.created_at, a.resolved_at)
+            : undefined,
+        }))
+      )
     }
 
     setLastSync(new Date())

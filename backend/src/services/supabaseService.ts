@@ -259,6 +259,7 @@ class SupabaseService {
     const { data, error } = await supabase
       .from('ai_insights')
       .select('*')
+      .gt('expires_at', new Date().toISOString())
       .order('created_at', { ascending: false })
       .limit(limit)
 
