@@ -2,13 +2,10 @@
 
 import {
   ResponsiveContainer,
-  LineChart,
-  Line,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
-  Legend,
   Area,
   AreaChart,
   TooltipProps,

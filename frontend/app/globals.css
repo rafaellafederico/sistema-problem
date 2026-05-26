@@ -133,12 +133,8 @@ body {
 }
 
 @keyframes glowCritical {
-  0%, 100% {
-    box-shadow: 0 0 4px rgba(239, 68, 68, 0.5);
-  }
-  50% {
-    box-shadow: 0 0 16px rgba(239, 68, 68, 0.8), 0 0 32px rgba(239, 68, 68, 0.3);
-  }
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 1; }
 }
 
 @keyframes pulseDot {
@@ -169,5 +165,16 @@ body {
 }
 
 .animate-glow-critical {
+  position: relative;
+}
+
+.animate-glow-critical::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: 0 0 12px rgba(239, 68, 68, 0.7), 0 0 28px rgba(239, 68, 68, 0.3);
   animation: glowCritical 2s ease-in-out infinite;
+  pointer-events: none;
+  will-change: opacity;
 }

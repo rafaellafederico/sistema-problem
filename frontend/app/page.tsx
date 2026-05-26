@@ -39,19 +39,31 @@ export default function DashboardPage() {
   const [usingMock, setUsingMock] = useState(true)
 
   const refreshAll = useCallback(async () => {
+    const [
+      alertsData,
+      metricsData,
+      paymentsData,
+      systemData,
+      salesHistory,
+      insightsData,
+      incidentsData,
+    ] = await Promise.all([
+      apiFetch<{ alerts: Alert[] }>('/api/alerts?limit=20&status=open,investigating'),
+      apiFetch<{ metrics: Record<string, number | string> }>('/api/metrics/sales'),
+      apiFetch<{ metrics: Record<string, number> }>('/api/metrics/payments'),
+      apiFetch<{ health: Array<{ service: string; status: string; uptime_percent: number }> }>('/api/metrics/system'),
+      apiFetch<{ data: HourlySalesPoint[] }>('/api/metrics/sales?type=hourly'),
+      apiFetch<{ insights: AIInsight[] }>('/api/ai/insights'),
+      apiFetch<{ alerts: IncidentRecord[] }>('/api/alerts?limit=10&status=resolved,investigating,open'),
+    ])
+
     // ── Alertas ────────────────────────────────────────────────────────────
-    const alertsData = await apiFetch<{ alerts: Alert[] }>(
-      '/api/alerts?limit=20&status=open,investigating'
-    )
     if (alertsData?.alerts?.length) {
       setAlerts(alertsData.alerts)
       setUsingMock(false)
     }
 
     // ── Métricas (cards) ───────────────────────────────────────────────────
-    const metricsData = await apiFetch<{ metrics: Record<string, number | string> }>(
-      '/api/metrics/sales'
-    )
     if (metricsData?.metrics) {
       const m = metricsData.metrics
       setUsingMock(false)
@@ -76,9 +88,6 @@ export default function DashboardPage() {
     }
 
     // ── Pagamentos ─────────────────────────────────────────────────────────
-    const paymentsData = await apiFetch<{ metrics: Record<string, number> }>(
-      '/api/metrics/payments'
-    )
     if (paymentsData?.metrics) {
       const p = paymentsData.metrics
       setMetricCards((prev) =>
@@ -91,9 +100,6 @@ export default function DashboardPage() {
     }
 
     // ── Sistema (uptime) ───────────────────────────────────────────────────
-    const systemData = await apiFetch<{ health: Array<{ service: string; status: string; uptime_percent: number }> }>(
-      '/api/metrics/system'
-    )
     if (systemData?.health) {
       const site = systemData.health.find((h) => h.service === 'site')
       if (site) {
@@ -112,23 +118,16 @@ export default function DashboardPage() {
     }
 
     // ── Gráfico de vendas por hora ─────────────────────────────────────────
-    const salesHistory = await apiFetch<{ data: HourlySalesPoint[] }>(
-      '/api/metrics/sales?type=hourly'
-    )
     if (salesHistory?.data?.length) {
       setHourlySales(salesHistory.data)
     }
 
     // ── Insights de IA ────────────────────────────────────────────────────
-    const insightsData = await apiFetch<{ insights: AIInsight[] }>('/api/ai/insights')
     if (insightsData?.insights?.length) {
       setAIInsights(insightsData.insights)
     }
 
     // ── Histórico de incidentes ────────────────────────────────────────────
-    const incidentsData = await apiFetch<{ alerts: IncidentRecord[] }>(
-      '/api/alerts?limit=10&status=resolved,investigating,open'
-    )
     if (incidentsData?.alerts?.length) {
       setIncidents(incidentsData.alerts as unknown as IncidentRecord[])
     }
