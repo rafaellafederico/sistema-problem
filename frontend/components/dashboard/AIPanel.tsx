@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Brain, Sparkles, ChevronRight, RefreshCw, TrendingUp, AlertCircle, Target } from 'lucide-react'
 import { AIInsight } from '@/lib/types'
 import { formatDistanceToNow } from 'date-fns'
@@ -159,6 +159,10 @@ export default function AIPanel({ insights }: AIPanelProps) {
   const [isGenerating, setIsGenerating] = useState(false)
   const [currentInsights, setCurrentInsights] = useState<AIInsight[]>(insights)
   const [lastGenerated, setLastGenerated] = useState<Date | null>(null)
+
+  useEffect(() => {
+    if (!isGenerating) setCurrentInsights(insights)
+  }, [insights, isGenerating])
 
   const handleGenerate = async () => {
     setIsGenerating(true)

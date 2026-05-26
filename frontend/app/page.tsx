@@ -7,14 +7,8 @@ import AlertFeed from '@/components/dashboard/AlertFeed'
 import SalesChart from '@/components/dashboard/SalesChart'
 import AIPanel from '@/components/dashboard/AIPanel'
 import IncidentHistory from '@/components/dashboard/IncidentHistory'
-import {
-  mockAlerts,
-  mockHourlySales,
-  mockMetricCards,
-  mockAIInsights,
-  mockIncidents,
-} from '@/lib/mockData'
-import { Alert, AIInsight, AlertSeverity, HourlySalesPoint, IncidentRecord, MetricCardData } from '@/lib/types'
+import { mockHourlySales, mockMetricCards } from '@/lib/mockData'
+import { Alert, AIInsight, HourlySalesPoint, IncidentRecord, MetricCardData } from '@/lib/types'
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
 
@@ -39,14 +33,13 @@ async function apiFetch<T>(path: string): Promise<T | null> {
 }
 
 export default function DashboardPage() {
-  const [alerts, setAlerts] = useState<Alert[]>(mockAlerts)
+  const [alerts, setAlerts] = useState<Alert[]>([])
   const [hourlySales, setHourlySales] = useState<HourlySalesPoint[]>(mockHourlySales)
   const [metricCards, setMetricCards] = useState<MetricCardData[]>(mockMetricCards)
-  const [aiInsights, setAIInsights] = useState<AIInsight[]>(mockAIInsights)
-  const [incidents, setIncidents] = useState<IncidentRecord[]>(mockIncidents)
+  const [aiInsights, setAIInsights] = useState<AIInsight[]>([])
+  const [incidents, setIncidents] = useState<IncidentRecord[]>([])
   const [lastSync, setLastSync] = useState<Date>(new Date())
   const [isOnline, setIsOnline] = useState(true)
-  const [usingMock, setUsingMock] = useState(true)
 
   const refreshAll = useCallback(async () => {
     const [
@@ -68,16 +61,13 @@ export default function DashboardPage() {
     ])
 
     // ── Alertas ────────────────────────────────────────────────────────────
-    // Clear mock as soon as API responds — even an empty list is real data
     if (alertsData !== null) {
       setAlerts(alertsData.alerts ?? [])
-      setUsingMock(false)
     }
 
     // ── Métricas (cards) ───────────────────────────────────────────────────
     if (metricsData?.metrics) {
       const m = metricsData.metrics
-      setUsingMock(false)
       setMetricCards((prev) =>
         prev.map((card) => {
           switch (card.id) {
@@ -196,14 +186,6 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen bg-background">
       <DashboardHeader lastSync={lastSync} isOnline={isOnline} />
-
-      {usingMock && (
-        <div className="bg-medium-bg border-b border-medium/20 px-4 py-2 text-center">
-          <span className="text-xs text-medium font-medium">
-            Exibindo dados de demonstração — backend não respondeu ou ainda sem dados reais
-          </span>
-        </div>
-      )}
 
       <main className="px-4 md:px-6 lg:px-8 pb-12 space-y-6 max-w-[1920px] mx-auto">
         <section>

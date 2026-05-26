@@ -23,22 +23,39 @@ router.get('/sales', async (req: Request, res: Response) => {
     // ── Hourly chart data ──────────────────────────────────────────────────
     if (type === 'hourly') {
       const history = await supabaseService.getSalesHistory(48)
+      const todayStartH = getBrazilMidnightUTC()
+      const hasDataFromToday = history.some(
+        (r) => r.snapshot_at && new Date(r.snapshot_at) >= todayStartH
+      )
 
-      // Map DB snapshots to { hour, today, yesterday } format
-      const now = new Date()
+      // Fallback: no today data in Supabase → compute from Nuvemshop live orders
+      if (!hasDataFromToday && process.env.NUVEMSHOP_STORE_ID && process.env.NUVEMSHOP_ACCESS_TOKEN) {
+        try {
+          console.log('[MetricsRoute] No today snapshots (hourly) — fetching live from Nuvemshop')
+          const yesterdayStart = new Date(todayStartH.getTime() - 24 * 60 * 60 * 1000)
+          const orders = await nuvemshopService.fetchOrders(yesterdayStart)
+          const data = nuvemshopService.computeHourlySales(orders, todayStartH)
+          return res.json({ data, source: 'live' })
+        } catch (err) {
+          console.error('[MetricsRoute] Nuvemshop hourly fallback failed:', err)
+        }
+      }
+
+      // Map DB snapshots to { hour, today, yesterday } format (BRT hours)
       const hourlyMap: Record<string, { today: number; yesterday: number }> = {}
-
       for (let h = 0; h < 24; h++) {
-        const label = `${String(h).padStart(2, '0')}:00`
-        hourlyMap[label] = { today: 0, yesterday: 0 }
+        hourlyMap[`${String(h).padStart(2, '0')}:00`] = { today: 0, yesterday: 0 }
       }
 
       for (const row of history) {
         const date = new Date(row.snapshot_at ?? '')
-        const diffDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24))
-        const label = `${String(date.getHours()).padStart(2, '0')}:00`
-        if (diffDays === 0) hourlyMap[label].today += row.revenue_brl
-        else if (diffDays === 1) hourlyMap[label].yesterday += row.revenue_brl
+        // Brazil is UTC-3, no DST
+        const brHour = ((date.getUTCHours() - 3) + 24) % 24
+        const label = `${String(brHour).padStart(2, '0')}:00`
+        const isToday = date >= todayStartH
+        const isYesterday = date >= new Date(todayStartH.getTime() - 24 * 60 * 60 * 1000) && !isToday
+        if (isToday) hourlyMap[label].today += row.revenue_brl
+        else if (isYesterday) hourlyMap[label].yesterday += row.revenue_brl
       }
 
       const data = Object.entries(hourlyMap).map(([hour, v]) => ({ hour, ...v }))
@@ -47,11 +64,15 @@ router.get('/sales', async (req: Request, res: Response) => {
 
     // ── Latest snapshot metrics ────────────────────────────────────────────
     let history = await supabaseService.getSalesHistory(24)
+    const todayStart = getBrazilMidnightUTC()
+    const hasDataFromToday = history.some(
+      (r) => r.snapshot_at && new Date(r.snapshot_at) >= todayStart
+    )
 
-    // Fallback: fetch live from Nuvemshop if Supabase is empty and creds exist
-    if (history.length === 0 && process.env.NUVEMSHOP_STORE_ID && process.env.NUVEMSHOP_ACCESS_TOKEN) {
+    // Fallback: no today snapshot in Supabase → fetch live from Nuvemshop
+    if (!hasDataFromToday && process.env.NUVEMSHOP_STORE_ID && process.env.NUVEMSHOP_ACCESS_TOKEN) {
       try {
-        console.log('[MetricsRoute] Supabase empty — fetching live from Nuvemshop')
+        console.log('[MetricsRoute] No today snapshots in Supabase — fetching live from Nuvemshop')
         const orders = await nuvemshopService.fetchOrders(getBrazilMidnightUTC())
         const live = nuvemshopService.computeMetrics(orders)
         return res.json({
@@ -70,12 +91,15 @@ router.get('/sales', async (req: Request, res: Response) => {
       }
     }
 
-    if (history.length === 0) {
+    if (!hasDataFromToday) {
       return res.json({ metrics: null })
     }
 
-    // Aggregate today's data from all snapshots (sum, not just latest)
-    const latest = history[history.length - 1]
+    // Use only today's snapshots — never serve yesterday's data as today's metrics
+    const todayHistory = history.filter(
+      (r) => r.snapshot_at && new Date(r.snapshot_at) >= todayStart
+    )
+    const latest = todayHistory[todayHistory.length - 1]
     const derivedAvgTicket =
       latest.orders_count > 0
         ? Math.round((latest.revenue_brl / latest.orders_count) * 100) / 100

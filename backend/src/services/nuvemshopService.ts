@@ -312,6 +312,43 @@ class NuvemshopService {
     return anomalies
   }
 
+  // Break orders into hourly BRT buckets for revenue chart (today vs yesterday)
+  computeHourlySales(
+    orders: NuvemshopOrder[],
+    todayStartUTC: Date
+  ): Array<{ hour: string; today: number; yesterday: number }> {
+    const yesterdayStartUTC = new Date(todayStartUTC.getTime() - 24 * 60 * 60 * 1000)
+
+    const hourlyMap: Record<string, { today: number; yesterday: number }> = {}
+    for (let h = 0; h < 24; h++) {
+      hourlyMap[`${String(h).padStart(2, '0')}:00`] = { today: 0, yesterday: 0 }
+    }
+
+    const paidOrders = orders.filter((o) => o.payment_status === 'paid')
+
+    for (const order of paidOrders) {
+      const orderDate = new Date(order.created_at)
+      // Brazil is always UTC-3 (no DST since 2019)
+      const brHour = ((orderDate.getUTCHours() - 3) + 24) % 24
+      const label = `${String(brHour).padStart(2, '0')}:00`
+      const revenue = parseFloat(order.total || '0')
+
+      if (orderDate >= todayStartUTC) {
+        hourlyMap[label].today += revenue
+      } else if (orderDate >= yesterdayStartUTC) {
+        hourlyMap[label].yesterday += revenue
+      }
+    }
+
+    return Object.entries(hourlyMap)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([hour, v]) => ({
+        hour,
+        today: Math.round(v.today * 100) / 100,
+        yesterday: Math.round(v.yesterday * 100) / 100,
+      }))
+  }
+
   // Break orders into hourly buckets for payment method analysis
   computeHourlyPaymentMix(orders: NuvemshopOrder[]): Array<{
     hour: string
