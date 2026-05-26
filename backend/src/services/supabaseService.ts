@@ -10,6 +10,8 @@ export interface AlertRecord {
   metadata?: Record<string, unknown>
   status?: 'open' | 'investigating' | 'resolved' | 'false_positive'
   notified_whatsapp?: boolean
+  created_at?: string
+  resolved_at?: string
 }
 
 export interface AlertFilters {
