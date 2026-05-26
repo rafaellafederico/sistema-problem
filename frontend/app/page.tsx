@@ -54,6 +54,7 @@ export default function DashboardPage() {
     )
     if (metricsData?.metrics) {
       const m = metricsData.metrics
+      setUsingMock(false)
       setMetricCards((prev) =>
         prev.map((card) => {
           switch (card.id) {
