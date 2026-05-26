@@ -19,61 +19,47 @@ function getBrazilMidnightUTC(): Date {
 router.get('/sales', async (req: Request, res: Response) => {
   try {
     const type = req.query.type as string | undefined
+    const todayStart = getBrazilMidnightUTC()
+    const hasNuvemshop = !!(process.env.NUVEMSHOP_STORE_ID && process.env.NUVEMSHOP_ACCESS_TOKEN)
 
     // ── Hourly chart data ──────────────────────────────────────────────────
     if (type === 'hourly') {
-      const history = await supabaseService.getSalesHistory(48)
-      const todayStartH = getBrazilMidnightUTC()
-      const hasDataFromToday = history.some(
-        (r) => r.snapshot_at && new Date(r.snapshot_at) >= todayStartH
-      )
-
-      // Fallback: no today data in Supabase → compute from Nuvemshop live orders
-      if (!hasDataFromToday && process.env.NUVEMSHOP_STORE_ID && process.env.NUVEMSHOP_ACCESS_TOKEN) {
+      // Nuvemshop is primary for hourly: gives accurate per-order BRT timestamps.
+      // Supabase snapshots accumulate within hours and can't be reliably split by delta.
+      if (hasNuvemshop) {
         try {
-          console.log('[MetricsRoute] No today snapshots (hourly) — fetching live from Nuvemshop')
-          const yesterdayStart = new Date(todayStartH.getTime() - 24 * 60 * 60 * 1000)
+          const yesterdayStart = new Date(todayStart.getTime() - 24 * 60 * 60 * 1000)
           const orders = await nuvemshopService.fetchOrders(yesterdayStart)
-          const data = nuvemshopService.computeHourlySales(orders, todayStartH)
+          const data = nuvemshopService.computeHourlySales(orders, todayStart)
           return res.json({ data, source: 'live' })
         } catch (err) {
-          console.error('[MetricsRoute] Nuvemshop hourly fallback failed:', err)
+          console.error('[MetricsRoute] Nuvemshop hourly failed, falling back to Supabase:', err)
         }
       }
 
-      // Map DB snapshots to { hour, today, yesterday } format (BRT hours)
+      // Supabase fallback (accurate only when worker stores per-interval deltas)
+      const history = await supabaseService.getSalesHistory(48)
       const hourlyMap: Record<string, { today: number; yesterday: number }> = {}
       for (let h = 0; h < 24; h++) {
         hourlyMap[`${String(h).padStart(2, '0')}:00`] = { today: 0, yesterday: 0 }
       }
-
       for (const row of history) {
         const date = new Date(row.snapshot_at ?? '')
-        // Brazil is UTC-3, no DST
         const brHour = ((date.getUTCHours() - 3) + 24) % 24
         const label = `${String(brHour).padStart(2, '0')}:00`
-        const isToday = date >= todayStartH
-        const isYesterday = date >= new Date(todayStartH.getTime() - 24 * 60 * 60 * 1000) && !isToday
+        const isToday = date >= todayStart
+        const isYesterday = date >= new Date(todayStart.getTime() - 24 * 60 * 60 * 1000) && !isToday
         if (isToday) hourlyMap[label].today += row.revenue_brl
         else if (isYesterday) hourlyMap[label].yesterday += row.revenue_brl
       }
-
-      const data = Object.entries(hourlyMap).map(([hour, v]) => ({ hour, ...v }))
-      return res.json({ data })
+      return res.json({ data: Object.entries(hourlyMap).map(([hour, v]) => ({ hour, ...v })) })
     }
 
-    // ── Latest snapshot metrics ────────────────────────────────────────────
-    let history = await supabaseService.getSalesHistory(24)
-    const todayStart = getBrazilMidnightUTC()
-    const hasDataFromToday = history.some(
-      (r) => r.snapshot_at && new Date(r.snapshot_at) >= todayStart
-    )
-
-    // Fallback: no today snapshot in Supabase → fetch live from Nuvemshop
-    if (!hasDataFromToday && process.env.NUVEMSHOP_STORE_ID && process.env.NUVEMSHOP_ACCESS_TOKEN) {
+    // ── Summary metrics ────────────────────────────────────────────────────
+    // Nuvemshop is primary: always matches what the store panel shows (paid orders only).
+    if (hasNuvemshop) {
       try {
-        console.log('[MetricsRoute] No today snapshots in Supabase — fetching live from Nuvemshop')
-        const orders = await nuvemshopService.fetchOrders(getBrazilMidnightUTC())
+        const orders = await nuvemshopService.fetchOrders(todayStart)
         const live = nuvemshopService.computeMetrics(orders)
         return res.json({
           metrics: {
@@ -87,18 +73,18 @@ router.get('/sales', async (req: Request, res: Response) => {
           source: 'live',
         })
       } catch (err) {
-        console.error('[MetricsRoute] Nuvemshop live fallback failed:', err)
+        console.error('[MetricsRoute] Nuvemshop summary failed, falling back to Supabase:', err)
       }
     }
 
-    if (!hasDataFromToday) {
-      return res.json({ metrics: null })
-    }
-
-    // Use only today's snapshots — never serve yesterday's data as today's metrics
+    // Supabase fallback
+    const history = await supabaseService.getSalesHistory(24)
     const todayHistory = history.filter(
       (r) => r.snapshot_at && new Date(r.snapshot_at) >= todayStart
     )
+    if (todayHistory.length === 0) {
+      return res.json({ metrics: null })
+    }
     const latest = todayHistory[todayHistory.length - 1]
     const derivedAvgTicket =
       latest.orders_count > 0
