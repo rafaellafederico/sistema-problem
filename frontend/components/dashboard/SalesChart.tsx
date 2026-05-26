@@ -149,11 +149,11 @@ export default function SalesChart({ data }: SalesChartProps) {
       </div>
 
       {/* Chart */}
-      <div className="flex-1 p-4 min-h-0">
+      <div className="flex-1 p-4 min-h-[220px]">
         <div className="flex justify-end mb-3">
           <CustomLegend />
         </div>
-        <ResponsiveContainer width="100%" height={260}>
+        <ResponsiveContainer width="100%" height={240}>
           <AreaChart
             data={slicedData}
             margin={{ top: 4, right: 8, left: 0, bottom: 0 }}

@@ -183,20 +183,20 @@ export default function DashboardPage() {
           <MetricCards cards={metricCards} />
         </section>
 
-        <section className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-          <div className="lg:col-span-2">
+        <section className="grid grid-cols-1 lg:grid-cols-5 gap-6 lg:h-[480px]">
+          <div className="h-[460px] lg:col-span-2 lg:h-full">
             <AlertFeed alerts={alerts} />
           </div>
-          <div className="lg:col-span-3">
+          <div className="lg:col-span-3 lg:h-full">
             <SalesChart data={hourlySales} />
           </div>
         </section>
 
-        <section className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-          <div className="lg:col-span-2">
+        <section className="grid grid-cols-1 lg:grid-cols-5 gap-6 lg:h-[480px]">
+          <div className="h-[420px] lg:col-span-2 lg:h-full">
             <AIPanel insights={aiInsights} />
           </div>
-          <div className="lg:col-span-3">
+          <div className="h-[500px] lg:col-span-3 lg:h-full">
             <IncidentHistory incidents={incidents} />
           </div>
         </section>

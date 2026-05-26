@@ -114,8 +114,65 @@ export default function IncidentHistory({ incidents }: IncidentHistoryProps) {
         </span>
       </div>
 
-      {/* Table */}
-      <div className="flex-1 overflow-auto min-h-0">
+      {/* Mobile card list (hidden on md+) */}
+      <div className="md:hidden flex-1 overflow-y-auto min-h-0 divide-y divide-border/40">
+        {paginated.length === 0 ? (
+          <div className="flex items-center justify-center h-32 text-text-tertiary text-sm">
+            Nenhum incidente registrado
+          </div>
+        ) : (
+          paginated.map((incident) => {
+            const statusCfg = statusConfig[incident.status] || statusConfig.resolved
+            const startDate = new Date(incident.start_time)
+            const startFormatted = format(startDate, 'dd/MM HH:mm', { locale: ptBR })
+            const timeAgo = formatDistanceToNow(startDate, { addSuffix: true, locale: ptBR })
+
+            return (
+              <div key={incident.id} className="px-4 py-3 space-y-2">
+                {/* Top row: severity + module + status */}
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <div className="flex items-center gap-2">
+                    <SeverityBadge severity={incident.severity} />
+                    <span className="text-xs font-medium text-text-primary">{incident.module}</span>
+                  </div>
+                  <span
+                    className={clsx(
+                      'inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold uppercase tracking-wider border',
+                      statusCfg.classes
+                    )}
+                  >
+                    {statusCfg.label}
+                  </span>
+                </div>
+
+                {/* Description */}
+                <p className="text-xs text-text-secondary leading-relaxed line-clamp-3">
+                  {incident.description}
+                </p>
+
+                {/* Time row */}
+                <div className="flex items-center gap-3 text-[11px] text-text-tertiary font-mono">
+                  <span>{startFormatted}</span>
+                  <span className="opacity-50">·</span>
+                  <span>{timeAgo}</span>
+                  {incident.end_time && incident.duration && (
+                    <>
+                      <span className="opacity-50">·</span>
+                      <span className="flex items-center gap-0.5">
+                        <Clock className="w-2.5 h-2.5" />
+                        {incident.duration}
+                      </span>
+                    </>
+                  )}
+                </div>
+              </div>
+            )
+          })
+        )}
+      </div>
+
+      {/* Desktop table (hidden below md) */}
+      <div className="hidden md:block flex-1 overflow-auto min-h-0">
         <table className="w-full text-xs" aria-label="Histórico de incidentes operacionais">
           <thead className="sticky top-0 bg-surface-2 z-10">
             <tr className="border-b border-border">

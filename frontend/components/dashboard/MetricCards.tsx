@@ -85,7 +85,7 @@ function MetricCard({ card }: { card: MetricCardData }) {
       <div className="flex flex-col gap-0.5 min-w-0">
         <span
           className={clsx(
-            'text-2xl font-bold tabular-nums tracking-tight leading-none truncate',
+            'text-xl 2xl:text-lg font-bold tabular-nums tracking-tight leading-none truncate',
             isNegative ? 'text-white' : 'text-text-primary'
           )}
           title={card.value}
@@ -125,7 +125,7 @@ export default function MetricCards({ cards }: MetricCardsProps) {
           Atualização: 5 min
         </span>
       </div>
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-9 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-9 gap-3 min-w-0">
         {cards.map((card) => (
           <MetricCard key={card.id} card={card} />
         ))}
