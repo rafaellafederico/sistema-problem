@@ -1,5 +1,11 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import './globals.css'
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  themeColor: '#0a0a0a',
+}
 
 export const metadata: Metadata = {
   title: 'Saint Germain — Central Operacional',
@@ -7,8 +13,6 @@ export const metadata: Metadata = {
   icons: {
     icon: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%230a0a0a'/><text x='50%' y='50%' dominant-baseline='central' text-anchor='middle' font-family='Inter,sans-serif' font-size='14' font-weight='700' fill='%23f5e6d0'>SG</text></svg>",
   },
-  themeColor: '#0a0a0a',
-  viewport: 'width=device-width, initial-scale=1',
 }
 
 export default function RootLayout({

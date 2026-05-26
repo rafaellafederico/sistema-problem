@@ -12,12 +12,21 @@ import {
 } from 'recharts'
 import { TrendingUp, BarChart3 } from 'lucide-react'
 import { HourlySalesPoint } from '@/lib/types'
-import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 
 interface SalesChartProps {
   data: HourlySalesPoint[]
 }
+
+// Design token values for recharts SVG props (CSS vars not supported in SVG attributes)
+const C = {
+  accent: '#f5e6d0',
+  textTertiary: '#555555',
+  border: '#1e1e1e',
+  borderMid: '#333333',
+  yesterday: '#444444',
+  yesterdayDot: '#888888',
+} as const
 
 function formatBRL(value: number): string {
   return new Intl.NumberFormat('pt-BR', {
@@ -35,9 +44,7 @@ function formatBRLShort(value: number): string {
   return formatBRL(value)
 }
 
-interface CustomTooltipProps extends TooltipProps<number, string> {}
-
-function CustomTooltip({ active, payload, label }: CustomTooltipProps) {
+function CustomTooltip({ active, payload, label }: TooltipProps<number, string>) {
   if (!active || !payload || !payload.length) return null
 
   const today = payload.find((p) => p.dataKey === 'today')
@@ -159,58 +166,58 @@ export default function SalesChart({ data }: SalesChartProps) {
           >
             <defs>
               <linearGradient id="gradientToday" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#f5e6d0" stopOpacity={0.15} />
-                <stop offset="95%" stopColor="#f5e6d0" stopOpacity={0} />
+                <stop offset="5%" stopColor={C.accent} stopOpacity={0.15} />
+                <stop offset="95%" stopColor={C.accent} stopOpacity={0} />
               </linearGradient>
               <linearGradient id="gradientYesterday" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#555555" stopOpacity={0.12} />
-                <stop offset="95%" stopColor="#555555" stopOpacity={0} />
+                <stop offset="5%" stopColor={C.textTertiary} stopOpacity={0.12} />
+                <stop offset="95%" stopColor={C.textTertiary} stopOpacity={0} />
               </linearGradient>
             </defs>
 
             <CartesianGrid
               strokeDasharray="3 3"
-              stroke="#1e1e1e"
+              stroke={C.border}
               vertical={false}
             />
 
             <XAxis
               dataKey="hour"
-              tick={{ fill: '#555555', fontSize: 11, fontFamily: 'JetBrains Mono, monospace' }}
+              tick={{ fill: C.textTertiary, fontSize: 11, fontFamily: 'JetBrains Mono, monospace' }}
               tickLine={false}
-              axisLine={{ stroke: '#1e1e1e' }}
+              axisLine={{ stroke: C.border }}
               interval={2}
             />
 
             <YAxis
               tickFormatter={formatBRLShort}
-              tick={{ fill: '#555555', fontSize: 11, fontFamily: 'JetBrains Mono, monospace' }}
+              tick={{ fill: C.textTertiary, fontSize: 11, fontFamily: 'JetBrains Mono, monospace' }}
               tickLine={false}
               axisLine={false}
               width={52}
             />
 
-            <Tooltip content={<CustomTooltip />} cursor={{ stroke: '#333333', strokeWidth: 1 }} />
+            <Tooltip content={<CustomTooltip />} cursor={{ stroke: C.borderMid, strokeWidth: 1 }} />
 
             <Area
               type="monotone"
               dataKey="yesterday"
-              stroke="#444444"
+              stroke={C.yesterday}
               strokeWidth={1.5}
               strokeDasharray="4 3"
               fill="url(#gradientYesterday)"
               dot={false}
-              activeDot={{ r: 4, fill: '#888888', strokeWidth: 0 }}
+              activeDot={{ r: 4, fill: C.yesterdayDot, strokeWidth: 0 }}
             />
 
             <Area
               type="monotone"
               dataKey="today"
-              stroke="#f5e6d0"
+              stroke={C.accent}
               strokeWidth={2}
               fill="url(#gradientToday)"
               dot={false}
-              activeDot={{ r: 5, fill: '#f5e6d0', strokeWidth: 0 }}
+              activeDot={{ r: 5, fill: C.accent, strokeWidth: 0 }}
             />
           </AreaChart>
         </ResponsiveContainer>

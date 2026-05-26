@@ -41,7 +41,6 @@ const config: Config = {
         'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
         'slide-in-right': 'slideInRight 0.3s ease-out',
         'fade-in': 'fadeIn 0.2s ease-out',
-        'glow-critical': 'glowCritical 2s ease-in-out infinite',
       },
       keyframes: {
         slideInRight: {
@@ -51,10 +50,6 @@ const config: Config = {
         fadeIn: {
           '0%': { opacity: '0', transform: 'translateY(-4px)' },
           '100%': { opacity: '1', transform: 'translateY(0)' },
-        },
-        glowCritical: {
-          '0%, 100%': { boxShadow: '0 0 4px #ef4444' },
-          '50%': { boxShadow: '0 0 16px #ef4444, 0 0 32px #ef444440' },
         },
       },
       backgroundImage: {
