@@ -316,12 +316,12 @@ class NuvemshopService {
   computeHourlySales(
     orders: NuvemshopOrder[],
     todayStartUTC: Date
-  ): Array<{ hour: string; today: number; yesterday: number }> {
+  ): Array<{ hour: string; today: number; yesterday: number; orders_today: number; orders_yesterday: number }> {
     const yesterdayStartUTC = new Date(todayStartUTC.getTime() - 24 * 60 * 60 * 1000)
 
-    const hourlyMap: Record<string, { today: number; yesterday: number }> = {}
+    const hourlyMap: Record<string, { today: number; yesterday: number; orders_today: number; orders_yesterday: number }> = {}
     for (let h = 0; h < 24; h++) {
-      hourlyMap[`${String(h).padStart(2, '0')}:00`] = { today: 0, yesterday: 0 }
+      hourlyMap[`${String(h).padStart(2, '0')}:00`] = { today: 0, yesterday: 0, orders_today: 0, orders_yesterday: 0 }
     }
 
     const paidOrders = orders.filter((o) => o.payment_status === 'paid')
@@ -335,8 +335,10 @@ class NuvemshopService {
 
       if (orderDate >= todayStartUTC) {
         hourlyMap[label].today += revenue
+        hourlyMap[label].orders_today++
       } else if (orderDate >= yesterdayStartUTC) {
         hourlyMap[label].yesterday += revenue
+        hourlyMap[label].orders_yesterday++
       }
     }
 
@@ -346,6 +348,8 @@ class NuvemshopService {
         hour,
         today: Math.round(v.today * 100) / 100,
         yesterday: Math.round(v.yesterday * 100) / 100,
+        orders_today: v.orders_today,
+        orders_yesterday: v.orders_yesterday,
       }))
   }
 

@@ -26,6 +26,8 @@ const EMPTY_HOURLY: HourlySalesPoint[] = Array.from({ length: 24 }, (_, h) => ({
   hour: `${String(h).padStart(2, '0')}:00`,
   today: 0,
   yesterday: 0,
+  orders_today: 0,
+  orders_yesterday: 0,
 }))
 
 function computeIncidentDuration(start: string, end: string): string {

@@ -110,6 +110,8 @@ export interface HourlySalesPoint {
   hour: string
   today: number
   yesterday: number
+  orders_today: number
+  orders_yesterday: number
 }
 
 export interface IncidentRecord {
