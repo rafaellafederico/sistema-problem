@@ -1,7 +1,7 @@
 import cron from 'node-cron'
 import axios from 'axios'
 import supabaseService from '../services/supabaseService'
-import nuvemshopService, { NuvemshopMetrics } from '../services/nuvemshopService'
+import nuvemshopService, { NuvemshopMetrics, NuvemshopOrder } from '../services/nuvemshopService'
 import openaiService from '../services/openaiService'
 import emailService from '../services/emailService'
 import instagramService from '../services/instagramService'
@@ -23,6 +23,8 @@ function getBrazilMidnightUTC(): Date {
 
 let lastKnownMetrics: NuvemshopMetrics | null = null
 let siteWasOffline = false
+let lastCardAlertAt: Date | null = null
+const CARD_ALERT_COOLDOWN_MS = 30 * 60 * 1000
 
 async function fetchAndAnalyzeMetrics(): Promise<void> {
   try {
@@ -111,12 +113,61 @@ async function fetchAndAnalyzeMetrics(): Promise<void> {
       }
     }
 
+    // Card processing health check (reuses orders already fetched)
+    await checkCardHealth(orders)
+
     lastKnownMetrics = currentMetrics
     console.log(
       `[MetricsWorker] Metrics snapshot saved — revenue: R$${currentMetrics.revenue_brl}, orders: ${currentMetrics.orders_count}`
     )
   } catch (error) {
     console.error('[MetricsWorker] Error fetching metrics:', error)
+  }
+}
+
+// Alerts when credit card authorized orders are stuck (>30 min without capture)
+// AND refund rate is elevated — indicates Appmax processing issue
+async function checkCardHealth(orders: NuvemshopOrder[]): Promise<void> {
+  try {
+    const approval = nuvemshopService.computeCardApprovalRate(orders)
+    const health = nuvemshopService.computeCardProcessingHealth(orders)
+
+    const total = approval.approved + approval.refunded
+    const refundedRate = total > 0 ? approval.refunded / total : 0
+
+    const hasStuck = health.stuck_orders > 0
+    const highRefunds = refundedRate > 0.15
+
+    const now = new Date()
+    const cooldownPassed = !lastCardAlertAt ||
+      now.getTime() - lastCardAlertAt.getTime() > CARD_ALERT_COOLDOWN_MS
+
+    if (hasStuck && highRefunds && cooldownPassed) {
+      const severity = health.stuck_orders > 2 || refundedRate > 0.25 ? 'critical' : 'high'
+      const refundedPct = (refundedRate * 100).toFixed(1)
+
+      await supabaseService.saveAlert({
+        severity,
+        module: 'Pagamentos',
+        title: `Cartão lento — ${health.stuck_orders} pedido(s) preso(s) em autorizado por ${health.max_wait_min}min`,
+        description: `${health.stuck_orders} pedido(s) de cartão aguardam captura há mais de 30 min (máx ${health.max_wait_min}min, média ${health.avg_wait_min}min). Taxa de estorno: ${refundedPct}% (${approval.refunded} em ${total}). Possível falha no processamento da Appmax.`,
+        source: 'monitoramento',
+        metadata: {
+          stuck_orders: health.stuck_orders,
+          max_wait_min: health.max_wait_min,
+          avg_wait_min: health.avg_wait_min,
+          refunded_count: approval.refunded,
+          refunded_rate_pct: +refundedPct,
+        },
+      })
+
+      lastCardAlertAt = now
+      console.log(`[MetricsWorker] Card alert: ${health.stuck_orders} stuck, ${refundedPct}% refunded`)
+    } else {
+      console.log(`[MetricsWorker] Card health OK — approved=${approval.approved}, authorized=${approval.authorized}, refunded=${approval.refunded}, stuck=${health.stuck_orders}`)
+    }
+  } catch (error) {
+    console.error('[MetricsWorker] Card health check error:', error)
   }
 }
 

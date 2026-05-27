@@ -397,33 +397,102 @@ class NuvemshopService {
       }))
   }
 
-  // Approval rate for credit card orders only (Appmax gateway)
-  // Formula: paid / (paid + voided) × 100
-  // Uses payment_details.method as primary discriminator to exclude Appmax PIX/boleto
-  // voided orders from being counted as refused card transactions.
+  // Appmax doesn't create voided orders for declined cards — declines don't appear in Nuvemshop.
+  // Instead, 'refunded' credit_card orders represent transactions reversed after capture
+  // (anti-fraud hold or actual refund). Formula: paid / (paid + refunded) × 100.
   computeCardApprovalRate(orders: NuvemshopOrder[]): {
-    approved: number
-    refused: number
-    rate: number
+    approved: number     // paid credit_card
+    authorized: number   // pre-authorized, pending capture
+    refunded: number     // reversed after capture
+    rate: number         // paid / (paid + refunded) × 100
   } {
     const isCreditCard = (o: NuvemshopOrder): boolean => {
       const method = o.payment_details?.method?.toLowerCase() ?? ''
       if (method) return method === 'credit_card'
-      // Fallback when payment_details absent: gateway name, excluding pix/boleto
       const gateway = o.gateway?.toLowerCase() ?? ''
       return (gateway.includes('credit') || gateway.includes('card')) &&
         !gateway.includes('pix') && !gateway.includes('boleto')
     }
 
     const cardOrders = orders.filter(isCreditCard)
-    const approved = cardOrders.filter((o) => o.payment_status === 'paid').length
-    const refused = cardOrders.filter((o) => o.payment_status === 'voided').length
-    const total = approved + refused
+    const approved  = cardOrders.filter((o) => o.payment_status === 'paid').length
+    const authorized = cardOrders.filter((o) => o.payment_status === 'authorized').length
+    const refunded  = cardOrders.filter((o) => o.payment_status === 'refunded').length
+    const total = approved + refunded
 
     return {
       approved,
-      refused,
+      authorized,
+      refunded,
       rate: total > 0 ? Math.round((approved / total) * 1000) / 10 : 0,
+    }
+  }
+
+  // Tracks processing health for credit card orders:
+  // - Authorized orders that haven't been captured yet (potential Appmax delay)
+  // - Hourly breakdown of paid card orders in BRT hours
+  computeCardProcessingHealth(orders: NuvemshopOrder[]): {
+    authorized_orders: number
+    stuck_orders: number       // authorized > 30 min without capture
+    avg_wait_min: number
+    max_wait_min: number
+    hourly_card_paid: Array<{ hour: string; count: number; revenue: number }>
+  } {
+    const isCreditCard = (o: NuvemshopOrder): boolean => {
+      const method = o.payment_details?.method?.toLowerCase() ?? ''
+      if (method) return method === 'credit_card'
+      const gateway = o.gateway?.toLowerCase() ?? ''
+      return (gateway.includes('credit') || gateway.includes('card')) &&
+        !gateway.includes('pix') && !gateway.includes('boleto')
+    }
+
+    const STUCK_THRESHOLD_MIN = 30
+    const now = Date.now()
+
+    const authorizedCards = orders.filter(
+      (o) => o.payment_status === 'authorized' && isCreditCard(o)
+    )
+
+    const waitTimes = authorizedCards.map((o) =>
+      Math.round((now - new Date(o.updated_at ?? o.created_at).getTime()) / 60000)
+    )
+
+    const stuck = waitTimes.filter((t) => t > STUCK_THRESHOLD_MIN).length
+    const avgWait = waitTimes.length > 0
+      ? Math.round(waitTimes.reduce((a, b) => a + b, 0) / waitTimes.length)
+      : 0
+    const maxWait = waitTimes.length > 0 ? Math.max(...waitTimes) : 0
+
+    // Hourly paid card orders in BRT (UTC-3)
+    const hourlyMap: Record<string, { count: number; revenue: number }> = {}
+    for (let h = 0; h < 24; h++) {
+      hourlyMap[`${String(h).padStart(2, '0')}:00`] = { count: 0, revenue: 0 }
+    }
+
+    const paidCardOrders = orders.filter(
+      (o) => o.payment_status === 'paid' && isCreditCard(o)
+    )
+
+    for (const order of paidCardOrders) {
+      const d = new Date(order.created_at)
+      const brHour = ((d.getUTCHours() - 3) + 24) % 24
+      const label = `${String(brHour).padStart(2, '0')}:00`
+      hourlyMap[label].count++
+      hourlyMap[label].revenue += parseFloat(order.total || '0')
+    }
+
+    return {
+      authorized_orders: authorizedCards.length,
+      stuck_orders: stuck,
+      avg_wait_min: avgWait,
+      max_wait_min: maxWait,
+      hourly_card_paid: Object.entries(hourlyMap)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([hour, v]) => ({
+          hour,
+          count: v.count,
+          revenue: Math.round(v.revenue * 100) / 100,
+        })),
     }
   }
 

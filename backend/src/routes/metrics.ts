@@ -128,8 +128,9 @@ router.get('/sales', async (req: Request, res: Response) => {
   }
 })
 
-// GET /api/metrics/payments → { metrics: { card_approval_rate, card_approved, card_refused } }
-// card_approval_rate = paid / (paid + voided) × 100 — filters Appmax credit card orders only
+// GET /api/metrics/payments → card approval rate + processing health
+// card_approval_rate = paid / (paid + refunded) × 100 — Appmax credit card only
+// Appmax doesn't create voided orders for declined cards; refunded = reversed after capture
 router.get('/payments', async (_req: Request, res: Response) => {
   try {
     const hasNuvemshop = !!(process.env.NUVEMSHOP_STORE_ID && process.env.NUVEMSHOP_ACCESS_TOKEN)
@@ -139,13 +140,22 @@ router.get('/payments', async (_req: Request, res: Response) => {
         const todayStart = getBrazilMidnightUTC()
         const orders = await nuvemshopService.fetchOrders(todayStart)
         const approval = nuvemshopService.computeCardApprovalRate(orders)
+        const health = nuvemshopService.computeCardProcessingHealth(orders)
 
         return res.json({
           metrics: {
             card_approval_rate: approval.rate,
             card_approved: approval.approved,
-            card_refused: approval.refused,
+            card_authorized: approval.authorized,
+            card_refunded: approval.refunded,
           },
+          processing: {
+            authorized_orders: health.authorized_orders,
+            stuck_orders: health.stuck_orders,
+            avg_wait_min: health.avg_wait_min,
+            max_wait_min: health.max_wait_min,
+          },
+          hourly_card_paid: health.hourly_card_paid,
           source: 'live',
         })
       } catch (err) {
