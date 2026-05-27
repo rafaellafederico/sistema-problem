@@ -156,7 +156,7 @@ export const mockMetricCards: MetricCardData[] = [
     changeLabel: 'vs baseline',
     positive: false,
     icon: 'BarChart2',
-    tooltip: 'Pedidos pagos ÷ total de pedidos criados (todos os status). Não inclui visitantes sem pedido — taxa de conversão real exigiria integração com analytics.',
+    tooltip: 'De todos os pedidos criados hoje, quantos foram efetivamente pagos. Não considera visitantes que saíram sem criar pedido.',
   },
   {
     id: 'checkout',

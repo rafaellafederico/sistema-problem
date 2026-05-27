@@ -140,7 +140,7 @@ function AlertItem({ alert, isLatest }: AlertItemProps) {
             {alert.status === 'open' && 'Aberto'}
             {alert.status === 'investigating' && 'Investigando'}
             {alert.status === 'resolved' && 'Resolvido'}
-            {alert.status === 'false_positive' && 'Falso Positivo'}
+            {alert.status === 'false_positive' && 'Falso alarme'}
           </span>
         </div>
       </div>
@@ -195,7 +195,7 @@ export default function AlertFeed({ alerts }: AlertFeedProps) {
       <div className="flex items-center justify-between px-4 py-3 border-b border-border flex-shrink-0">
         <div className="flex items-center gap-2">
           <Bell className="w-4 h-4 text-accent" />
-          <span className="text-sm font-semibold text-text-primary">Feed de Alertas</span>
+          <span className="text-sm font-semibold text-text-primary">Alertas</span>
           {counts.critical > 0 && (
             <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-critical-bg border border-critical/30 text-critical text-[10px] font-semibold">
               {counts.critical}
@@ -241,13 +241,17 @@ export default function AlertFeed({ alerts }: AlertFeedProps) {
         {filteredAlerts.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full gap-2 text-text-tertiary py-12">
             <Zap className="w-8 h-8 opacity-30" />
-            <p className="text-sm">Nenhum alerta {filter !== 'all' ? `"${filter}"` : ''}</p>
+            <p className="text-sm">
+              {filter === 'all'
+                ? 'Nenhum alerta no momento'
+                : `Nenhum alerta ${{ critical: 'crítico', high: 'alto', medium: 'médio', low: 'baixo' }[filter] ?? filter}`}
+            </p>
           </div>
         ) : (
           <div
             className="px-3 py-2"
             aria-live="polite"
-            aria-label="Feed de alertas operacionais"
+            aria-label="Alertas operacionais"
             role="log"
           >
             {filteredAlerts.map((alert) => (
@@ -267,7 +271,7 @@ export default function AlertFeed({ alerts }: AlertFeedProps) {
           {filteredAlerts.length} alertas exibidos
         </span>
         <span className="text-[10px] text-text-tertiary font-mono">
-          Realtime ativo
+          Tempo real
         </span>
       </div>
     </div>

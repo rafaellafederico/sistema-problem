@@ -201,7 +201,7 @@ export default function AIPanel({ insights }: AIPanelProps) {
         </div>
         <div className="flex items-center gap-2">
           <span className="text-[10px] font-mono text-text-tertiary">
-            GPT-4o-mini
+            IA ativa
           </span>
         </div>
       </div>
@@ -212,14 +212,13 @@ export default function AIPanel({ insights }: AIPanelProps) {
           <Sparkles className="w-3.5 h-3.5 text-accent mt-0.5 flex-shrink-0" />
           <div className="flex-1 min-w-0">
             <p className="text-xs font-medium text-text-primary mb-0.5">
-              Status Operacional IA
+              Situação atual
             </p>
             <p className="text-[11px] text-text-secondary leading-relaxed">
-              {currentInsights.length} insights ativos · confiança média{' '}
+              {currentInsights.length} {currentInsights.length === 1 ? 'análise ativa' : 'análises ativas'} · confiança média{' '}
               <span className="text-accent font-semibold">
                 {Math.round(avgConfidence * 100)}%
               </span>
-              {' '}· monitoramento contínuo ativo
             </p>
           </div>
         </div>
@@ -233,9 +232,9 @@ export default function AIPanel({ insights }: AIPanelProps) {
           <div className="flex flex-col items-center justify-center h-full gap-3 py-10 text-center">
             <Brain className="w-8 h-8 text-text-tertiary opacity-30" />
             <div>
-              <p className="text-xs font-medium text-text-secondary">Nenhum insight gerado</p>
+              <p className="text-xs font-medium text-text-secondary">Nenhuma análise disponível</p>
               <p className="text-[11px] text-text-tertiary mt-1 leading-relaxed">
-                Clique em "Gerar Nova Análise" para que a IA analise os alertas ativos.
+                Clique em "Gerar análise" para que a IA avalie os alertas ativos.
               </p>
             </div>
           </div>
@@ -260,7 +259,7 @@ export default function AIPanel({ insights }: AIPanelProps) {
           )}
         >
           <RefreshCw className={clsx('w-3.5 h-3.5', isGenerating && 'animate-spin')} />
-          {isGenerating ? 'Gerando análise...' : 'Gerar Nova Análise'}
+          {isGenerating ? 'Analisando...' : 'Gerar análise'}
         </button>
         {lastGenerated && (
           <p className="text-[10px] text-text-tertiary text-center mt-1.5 font-mono">

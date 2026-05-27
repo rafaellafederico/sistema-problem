@@ -56,7 +56,7 @@ export default function DashboardHeader({ lastSync, isOnline }: DashboardHeaderP
           <div className="flex items-center gap-6">
             <div className="hidden sm:flex flex-col items-end">
               <span className="text-xs text-text-tertiary uppercase tracking-wider font-medium">
-                Última Sincronização
+                Última atualização
               </span>
               <span className="text-xs font-mono text-text-secondary">{syncTime}</span>
             </div>
