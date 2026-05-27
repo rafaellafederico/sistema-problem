@@ -128,14 +128,34 @@ router.get('/sales', async (req: Request, res: Response) => {
   }
 })
 
-// GET /api/metrics/payments → { metrics: { card_approval_rate, pix_rate } }
+// GET /api/metrics/payments → { metrics: { card_approval_rate, card_approved, card_refused } }
+// card_approval_rate = paid / (paid + voided) × 100 — filters Appmax credit card orders only
 router.get('/payments', async (_req: Request, res: Response) => {
   try {
-    const history = await supabaseService.getSalesHistory(24)
+    const hasNuvemshop = !!(process.env.NUVEMSHOP_STORE_ID && process.env.NUVEMSHOP_ACCESS_TOKEN)
 
-    if (history.length === 0) {
-      return res.json({ metrics: null })
+    if (hasNuvemshop) {
+      try {
+        const todayStart = getBrazilMidnightUTC()
+        const orders = await nuvemshopService.fetchOrders(todayStart)
+        const approval = nuvemshopService.computeCardApprovalRate(orders)
+
+        return res.json({
+          metrics: {
+            card_approval_rate: approval.rate,
+            card_approved: approval.approved,
+            card_refused: approval.refused,
+          },
+          source: 'live',
+        })
+      } catch (err) {
+        console.error('[MetricsRoute] Nuvemshop payments failed, falling back to Supabase:', err)
+      }
     }
+
+    // Supabase fallback — card mix ratio only, not true approval rate
+    const history = await supabaseService.getSalesHistory(24)
+    if (history.length === 0) return res.json({ metrics: null })
 
     const latest = history[history.length - 1]
     const total = latest.orders_count || 0
@@ -144,13 +164,14 @@ router.get('/payments', async (_req: Request, res: Response) => {
 
     return res.json({
       metrics: {
-        card_approval_rate: total > 0 ? (card / total) * 100 : 0,
-        pix_rate: total > 0 ? (pix / total) * 100 : 0,
+        card_approval_rate: total > 0 ? Math.round((card / total) * 1000) / 10 : 0,
+        pix_rate: total > 0 ? Math.round((pix / total) * 1000) / 10 : 0,
         total_orders: total,
         pix_orders: pix,
         card_orders: card,
       },
       snapshot_at: latest.snapshot_at,
+      source: 'supabase',
     })
   } catch (error) {
     console.error('[MetricsRoute] Error fetching payments:', error)

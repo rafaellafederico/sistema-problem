@@ -397,6 +397,32 @@ class NuvemshopService {
       }))
   }
 
+  // Approval rate for credit card orders only (Appmax gateway)
+  // Formula: paid / (paid + voided) × 100
+  // Nuvemshop records declined Appmax transactions as payment_status='voided'
+  computeCardApprovalRate(orders: NuvemshopOrder[]): {
+    approved: number
+    refused: number
+    rate: number
+  } {
+    const isCardOrder = (o: NuvemshopOrder) =>
+      o.gateway?.toLowerCase().includes('appmax') ||
+      o.payment_details?.method?.toLowerCase() === 'credit_card' ||
+      o.gateway?.toLowerCase().includes('credit') ||
+      o.gateway?.toLowerCase().includes('card')
+
+    const cardOrders = orders.filter(isCardOrder)
+    const approved = cardOrders.filter((o) => o.payment_status === 'paid').length
+    const refused = cardOrders.filter((o) => o.payment_status === 'voided').length
+    const total = approved + refused
+
+    return {
+      approved,
+      refused,
+      rate: total > 0 ? Math.round((approved / total) * 1000) / 10 : 0,
+    }
+  }
+
   setBaseline(metrics: NuvemshopMetrics): void {
     this.baselineMetrics = metrics
   }
