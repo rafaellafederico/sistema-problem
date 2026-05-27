@@ -399,19 +399,23 @@ class NuvemshopService {
 
   // Approval rate for credit card orders only (Appmax gateway)
   // Formula: paid / (paid + voided) × 100
-  // Nuvemshop records declined Appmax transactions as payment_status='voided'
+  // Uses payment_details.method as primary discriminator to exclude Appmax PIX/boleto
+  // voided orders from being counted as refused card transactions.
   computeCardApprovalRate(orders: NuvemshopOrder[]): {
     approved: number
     refused: number
     rate: number
   } {
-    const isCardOrder = (o: NuvemshopOrder) =>
-      o.gateway?.toLowerCase().includes('appmax') ||
-      o.payment_details?.method?.toLowerCase() === 'credit_card' ||
-      o.gateway?.toLowerCase().includes('credit') ||
-      o.gateway?.toLowerCase().includes('card')
+    const isCreditCard = (o: NuvemshopOrder): boolean => {
+      const method = o.payment_details?.method?.toLowerCase() ?? ''
+      if (method) return method === 'credit_card'
+      // Fallback when payment_details absent: gateway name, excluding pix/boleto
+      const gateway = o.gateway?.toLowerCase() ?? ''
+      return (gateway.includes('credit') || gateway.includes('card')) &&
+        !gateway.includes('pix') && !gateway.includes('boleto')
+    }
 
-    const cardOrders = orders.filter(isCardOrder)
+    const cardOrders = orders.filter(isCreditCard)
     const approved = cardOrders.filter((o) => o.payment_status === 'paid').length
     const refused = cardOrders.filter((o) => o.payment_status === 'voided').length
     const total = approved + refused
