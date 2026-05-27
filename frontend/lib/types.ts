@@ -104,6 +104,7 @@ export interface MetricCardData {
   positive: boolean
   icon: string
   status?: 'online' | 'degraded' | 'offline'
+  tooltip?: string
 }
 
 export interface HourlySalesPoint {

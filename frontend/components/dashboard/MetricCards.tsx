@@ -12,6 +12,7 @@ import {
   XCircle,
   Wifi,
   TrendingDown,
+  Info,
 } from 'lucide-react'
 import { MetricCardData } from '@/lib/types'
 import StatusDot from '@/components/ui/StatusDot'
@@ -92,9 +93,21 @@ function MetricCard({ card }: { card: MetricCardData }) {
         >
           {card.value}
         </span>
-        <span className="text-xs font-medium text-text-secondary uppercase tracking-wider truncate">
-          {card.label}
-        </span>
+        <div className="flex items-center gap-1 min-w-0">
+          <span className="text-xs font-medium text-text-secondary uppercase tracking-wider truncate">
+            {card.label}
+          </span>
+          {card.tooltip && (
+            <div className="relative flex-shrink-0 group/tip">
+              <Info className="w-3 h-3 text-text-tertiary hover:text-text-secondary cursor-help transition-colors" />
+              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-56 p-2.5 rounded-lg bg-surface-3 border border-border-2 shadow-xl opacity-0 pointer-events-none group-hover/tip:opacity-100 transition-opacity duration-150 z-50">
+                <p className="text-[11px] text-text-secondary leading-relaxed normal-case tracking-normal font-normal">
+                  {card.tooltip}
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Change Indicator */}
