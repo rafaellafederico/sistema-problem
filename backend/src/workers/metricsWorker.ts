@@ -25,6 +25,7 @@ let lastKnownMetrics: NuvemshopMetrics | null = null
 let siteWasOffline = false
 let lastCardAlertAt: Date | null = null
 const CARD_ALERT_COOLDOWN_MS = 30 * 60 * 1000
+const alertedHours = new Set<string>() // tracks hours already alerted today, resets on deploy
 
 async function fetchAndAnalyzeMetrics(): Promise<void> {
   try {
@@ -116,6 +117,11 @@ async function fetchAndAnalyzeMetrics(): Promise<void> {
     // Card processing health check (reuses orders already fetched)
     await checkCardHealth(orders)
 
+    // Hourly revenue drop detection (reuses orders already fetched)
+    const hourlySales = nuvemshopService.computeHourlySales(orders, todayMidnight)
+    const currentBRTHour = ((new Date().getUTCHours() - 3) + 24) % 24
+    await checkHourlyRevenueDrop(hourlySales, currentBRTHour)
+
     lastKnownMetrics = currentMetrics
     console.log(
       `[MetricsWorker] Metrics snapshot saved — revenue: R$${currentMetrics.revenue_brl}, orders: ${currentMetrics.orders_count}`
@@ -168,6 +174,44 @@ async function checkCardHealth(orders: NuvemshopOrder[]): Promise<void> {
     }
   } catch (error) {
     console.error('[MetricsWorker] Card health check error:', error)
+  }
+}
+
+// Fires once per hour when today's revenue for that hour drops >= 30% vs yesterday
+async function checkHourlyRevenueDrop(
+  hourlySales: Array<{ hour: string; today: number; yesterday: number }>,
+  currentBRTHour: number
+): Promise<void> {
+  try {
+    const today = new Date().toISOString().slice(0, 10)
+    const drops = nuvemshopService.detectHourlyRevenueDrop(hourlySales, currentBRTHour)
+
+    for (const drop of drops) {
+      const key = `${today}-${drop.hour}`
+      if (alertedHours.has(key)) continue
+      alertedHours.add(key)
+
+      const fmtBRL = (v: number) =>
+        `R$${v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+
+      await supabaseService.saveAlert({
+        severity: drop.severity,
+        module: 'Vendas',
+        title: `Queda de faturamento às ${drop.hour} — ${drop.drop_pct}% abaixo de ontem`,
+        description: `Às ${drop.hour} o faturamento foi ${fmtBRL(drop.today)}, queda de ${drop.drop_pct}% em relação ao mesmo horário de ontem (${fmtBRL(drop.yesterday)}).`,
+        source: 'monitoramento',
+        metadata: {
+          hour: drop.hour,
+          today_revenue: drop.today,
+          yesterday_revenue: drop.yesterday,
+          drop_pct: drop.drop_pct,
+        },
+      })
+
+      console.log(`[MetricsWorker] Hourly revenue drop alert: ${drop.hour} — ${drop.drop_pct}% vs ontem`)
+    }
+  } catch (error) {
+    console.error('[MetricsWorker] Hourly revenue drop check error:', error)
   }
 }
 

@@ -500,6 +500,35 @@ class NuvemshopService {
     }
   }
 
+  // Detect hours where today's revenue dropped significantly vs same hour yesterday.
+  // Only checks completed hours (h < currentBRTHour) with meaningful baseline (>= minYesterday).
+  detectHourlyRevenueDrop(
+    hourlySales: Array<{ hour: string; today: number; yesterday: number }>,
+    currentBRTHour: number,
+    minYesterdayRevenue = 500
+  ): Array<{ hour: string; today: number; yesterday: number; drop_pct: number; severity: 'critical' | 'high' }> {
+    const drops: Array<{ hour: string; today: number; yesterday: number; drop_pct: number; severity: 'critical' | 'high' }> = []
+
+    for (const point of hourlySales) {
+      const h = parseInt(point.hour)
+      if (h >= currentBRTHour) continue
+      if (point.yesterday < minYesterdayRevenue) continue
+
+      const dropPct = ((point.yesterday - point.today) / point.yesterday) * 100
+      if (dropPct < 30) continue
+
+      drops.push({
+        hour: point.hour,
+        today: point.today,
+        yesterday: point.yesterday,
+        drop_pct: Math.round(dropPct * 10) / 10,
+        severity: dropPct >= 50 ? 'critical' : 'high',
+      })
+    }
+
+    return drops
+  }
+
   setBaseline(metrics: NuvemshopMetrics): void {
     this.baselineMetrics = metrics
   }
