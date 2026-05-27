@@ -7,10 +7,26 @@ import AlertFeed from '@/components/dashboard/AlertFeed'
 import SalesChart from '@/components/dashboard/SalesChart'
 import AIPanel from '@/components/dashboard/AIPanel'
 import IncidentHistory from '@/components/dashboard/IncidentHistory'
-import { mockHourlySales, mockMetricCards } from '@/lib/mockData'
+import { mockMetricCards } from '@/lib/mockData'
 import { Alert, AIInsight, HourlySalesPoint, IncidentRecord, MetricCardData } from '@/lib/types'
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
+
+// Cards com estrutura real mas sem nenhum valor inventado enquanto carrega
+const PLACEHOLDER_CARDS: MetricCardData[] = mockMetricCards.map((c) => ({
+  ...c,
+  value: '—',
+  rawValue: 0,
+  change: 0,
+  positive: true,
+}))
+
+// Gráfico vazio no formato da API (HH:00) — sem dados fake enquanto carrega
+const EMPTY_HOURLY: HourlySalesPoint[] = Array.from({ length: 24 }, (_, h) => ({
+  hour: `${String(h).padStart(2, '0')}:00`,
+  today: 0,
+  yesterday: 0,
+}))
 
 function computeIncidentDuration(start: string, end: string): string {
   const ms = new Date(end).getTime() - new Date(start).getTime()
@@ -34,8 +50,8 @@ async function apiFetch<T>(path: string): Promise<T | null> {
 
 export default function DashboardPage() {
   const [alerts, setAlerts] = useState<Alert[]>([])
-  const [hourlySales, setHourlySales] = useState<HourlySalesPoint[]>(mockHourlySales)
-  const [metricCards, setMetricCards] = useState<MetricCardData[]>(mockMetricCards)
+  const [hourlySales, setHourlySales] = useState<HourlySalesPoint[]>(EMPTY_HOURLY)
+  const [metricCards, setMetricCards] = useState<MetricCardData[]>(PLACEHOLDER_CARDS)
   const [aiInsights, setAIInsights] = useState<AIInsight[]>([])
   const [incidents, setIncidents] = useState<IncidentRecord[]>([])
   const [lastSync, setLastSync] = useState<Date>(new Date())
@@ -65,22 +81,62 @@ export default function DashboardPage() {
       setAlerts(alertsData.alerts ?? [])
     }
 
-    // ── Métricas (cards) ───────────────────────────────────────────────────
+    // ── Métricas (cards) — inclui comparativos reais vs ontem ──────────────
     if (metricsData?.metrics) {
       const m = metricsData.metrics
+      const n = (v: unknown) => Number(v ?? 0)
       setMetricCards((prev) =>
         prev.map((card) => {
           switch (card.id) {
             case 'revenue':
-              return { ...card, value: `R$ ${Number(m.revenue_brl ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` }
+              return {
+                ...card,
+                value: `R$ ${n(m.revenue_brl).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
+                rawValue: n(m.revenue_brl),
+                change: n(m.revenue_change_pct),
+                positive: n(m.revenue_change_pct) >= 0,
+              }
             case 'orders':
-              return { ...card, value: String(m.orders_count ?? card.value) }
+              return {
+                ...card,
+                value: String(m.orders_count ?? '—'),
+                rawValue: n(m.orders_count),
+                change: n(m.orders_change_pct),
+                positive: n(m.orders_change_pct) >= 0,
+              }
             case 'ticket':
-              return { ...card, value: `R$ ${Number(m.avg_ticket_brl ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` }
+              return {
+                ...card,
+                value: `R$ ${n(m.avg_ticket_brl).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
+                rawValue: n(m.avg_ticket_brl),
+                change: n(m.avg_ticket_change_pct),
+                positive: n(m.avg_ticket_change_pct) >= 0,
+              }
             case 'pix_orders':
-              return { ...card, value: String(m.pix_orders ?? card.value) }
+              return {
+                ...card,
+                value: String(m.pix_orders ?? '—'),
+                rawValue: n(m.pix_orders),
+                change: n(m.pix_change_pct),
+                positive: n(m.pix_change_pct) >= 0,
+              }
             case 'coupons':
-              return { ...card, value: String(m.coupon_uses ?? card.value) }
+              return {
+                ...card,
+                value: String(m.coupon_uses ?? '—'),
+                rawValue: n(m.coupon_uses),
+                change: n(m.coupon_change_pct),
+                positive: n(m.coupon_change_pct) >= 0,
+              }
+            case 'conversion':
+              return {
+                ...card,
+                value: `${n(m.conversion_rate).toFixed(1)}%`,
+                rawValue: n(m.conversion_rate),
+                change: n(m.conversion_change_pct),
+                positive: n(m.conversion_change_pct) >= 0,
+                changeLabel: 'vs ontem',
+              }
             default:
               return card
           }
@@ -88,32 +144,44 @@ export default function DashboardPage() {
       )
     }
 
-    // ── Pagamentos ─────────────────────────────────────────────────────────
+    // ── Aprovação de cartão (Supabase fallback) ────────────────────────────
     if (paymentsData?.metrics) {
       const p = paymentsData.metrics
       setMetricCards((prev) =>
         prev.map((card) =>
           card.id === 'card_approval'
-            ? { ...card, value: `${Number(p.card_approval_rate ?? card.value).toFixed(1)}%` }
+            ? { ...card, value: `${Number(p.card_approval_rate ?? 0).toFixed(1)}%`, rawValue: Number(p.card_approval_rate ?? 0) }
             : card
         )
       )
     }
 
-    // ── Sistema (uptime) ───────────────────────────────────────────────────
+    // ── Sistema (uptime + checkout) ────────────────────────────────────────
     if (systemData?.health) {
       const site = systemData.health.find((h) => h.service === 'site')
+      const checkoutSvc = systemData.health.find((h) => h.service === 'checkout') ?? site
       if (site) {
+        const siteStatus = site.status === 'online' ? 'online' : site.status === 'degraded' ? 'degraded' : 'offline'
         setMetricCards((prev) =>
-          prev.map((card) =>
-            card.id === 'uptime'
-              ? {
-                  ...card,
-                  value: `${(site.uptime_percent ?? 100).toFixed(2)}%`,
-                  status: site.status === 'online' ? 'online' : site.status === 'degraded' ? 'degraded' : 'offline',
-                }
-              : card
-          )
+          prev.map((card) => {
+            if (card.id === 'uptime') {
+              return {
+                ...card,
+                value: `${(site.uptime_percent ?? 100).toFixed(2)}%`,
+                rawValue: site.uptime_percent ?? 100,
+                status: siteStatus,
+              }
+            }
+            if (card.id === 'checkout' && checkoutSvc) {
+              const cs = checkoutSvc.status === 'online' ? 'online' : checkoutSvc.status === 'degraded' ? 'degraded' : 'offline'
+              return {
+                ...card,
+                value: checkoutSvc.status === 'online' ? 'Operacional' : checkoutSvc.status === 'degraded' ? 'Degradado' : 'Offline',
+                status: cs,
+              }
+            }
+            return card
+          })
         )
       }
     }
@@ -129,7 +197,6 @@ export default function DashboardPage() {
     }
 
     // ── Histórico de incidentes ────────────────────────────────────────────
-    // API returns Alert[] — map to IncidentRecord (field names differ)
     if (incidentsData !== null) {
       setIncidents(
         (incidentsData.alerts ?? []).map((a): IncidentRecord => ({

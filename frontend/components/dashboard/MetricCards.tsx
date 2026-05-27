@@ -103,7 +103,9 @@ function MetricCard({ card }: { card: MetricCardData }) {
           {card.change > 0 ? '+' : ''}
           {card.change !== 0 ? `${card.change}%` : '—'}
         </span>
-        <span className="text-xs text-text-tertiary">{card.changeLabel}</span>
+        {card.change !== 0 && card.changeLabel && (
+          <span className="text-xs text-text-tertiary">{card.changeLabel}</span>
+        )}
       </div>
 
       {/* Critical Indicator Bar */}
@@ -122,7 +124,7 @@ export default function MetricCards({ cards }: MetricCardsProps) {
           Métricas em Tempo Real
         </h2>
         <span className="text-xs text-text-tertiary font-mono">
-          Atualização: 5 min
+          Atualização: 30s
         </span>
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-9 gap-3 min-w-0">

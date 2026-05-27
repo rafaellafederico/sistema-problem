@@ -56,19 +56,39 @@ router.get('/sales', async (req: Request, res: Response) => {
     }
 
     // ── Summary metrics ────────────────────────────────────────────────────
-    // Nuvemshop is primary: always matches what the store panel shows (paid orders only).
+    // Nuvemshop is primary. Fetch 48h so we can compute today vs yesterday comparisons.
     if (hasNuvemshop) {
       try {
-        const orders = await nuvemshopService.fetchOrders(todayStart)
-        const live = nuvemshopService.computeMetrics(orders)
+        const yesterdayStart = new Date(todayStart.getTime() - 24 * 60 * 60 * 1000)
+        const allOrders = await nuvemshopService.fetchOrders(yesterdayStart)
+
+        const todayOrders = allOrders.filter((o) => new Date(o.created_at) >= todayStart)
+        const yesterdayOrders = allOrders.filter((o) => {
+          const d = new Date(o.created_at)
+          return d >= yesterdayStart && d < todayStart
+        })
+
+        const todayM = nuvemshopService.computeMetrics(todayOrders)
+        const yestM = nuvemshopService.computeMetrics(yesterdayOrders)
+
+        const pct = (curr: number, prev: number): number =>
+          prev > 0 ? Math.round(((curr - prev) / prev) * 1000) / 10 : 0
+
         return res.json({
           metrics: {
-            revenue_brl: live.revenue_brl,
-            orders_count: live.orders_count,
-            avg_ticket_brl: live.avg_ticket_brl,
-            pix_orders: live.pix_orders,
-            card_orders: live.card_orders,
-            coupon_uses: live.coupon_uses,
+            revenue_brl: todayM.revenue_brl,
+            revenue_change_pct: pct(todayM.revenue_brl, yestM.revenue_brl),
+            orders_count: todayM.orders_count,
+            orders_change_pct: pct(todayM.orders_count, yestM.orders_count),
+            avg_ticket_brl: todayM.avg_ticket_brl,
+            avg_ticket_change_pct: pct(todayM.avg_ticket_brl, yestM.avg_ticket_brl),
+            pix_orders: todayM.pix_orders,
+            pix_change_pct: pct(todayM.pix_orders, yestM.pix_orders),
+            card_orders: todayM.card_orders,
+            coupon_uses: todayM.coupon_uses,
+            coupon_change_pct: pct(todayM.coupon_uses, yestM.coupon_uses),
+            conversion_rate: todayM.conversion_rate,
+            conversion_change_pct: pct(todayM.conversion_rate, yestM.conversion_rate),
           },
           source: 'live',
         })
