@@ -254,6 +254,25 @@ router.get('/payments/hourly', async (_req: Request, res: Response) => {
   }
 })
 
+// GET /api/metrics/payments/debug - inspect raw gateway+method values (temporary)
+router.get('/payments/debug', async (_req: Request, res: Response) => {
+  try {
+    const todayStart = getBrazilMidnightUTC()
+    const orders = await nuvemshopService.fetchOrders(todayStart)
+
+    const breakdown: Record<string, number> = {}
+    for (const o of orders) {
+      const key = `${o.payment_status} | gw:${o.gateway ?? 'null'} | method:${o.payment_details?.method ?? 'null'}`
+      breakdown[key] = (breakdown[key] ?? 0) + 1
+    }
+
+    res.json({ total_orders: orders.length, breakdown })
+  } catch (error) {
+    console.error('[MetricsRoute] Error in payments debug:', error)
+    res.status(500).json({ error: 'Failed' })
+  }
+})
+
 // GET /api/metrics/nuvemshop/live - fetch live from Nuvemshop (debug/admin)
 router.get('/nuvemshop/live', async (_req: Request, res: Response) => {
   try {
