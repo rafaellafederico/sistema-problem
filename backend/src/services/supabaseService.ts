@@ -19,6 +19,7 @@ export interface AlertFilters {
   status?: string
   limit?: number
   offset?: number
+  since?: string // ISO string — filter created_at >= since
 }
 
 export interface SalesMetricRecord {
@@ -97,6 +98,10 @@ class SupabaseService {
     if (filters.status) {
       const statuses = filters.status.split(',').map((s) => s.trim())
       query = query.in('status', statuses)
+    }
+
+    if (filters.since) {
+      query = query.gte('created_at', filters.since)
     }
 
     if (filters.limit) {

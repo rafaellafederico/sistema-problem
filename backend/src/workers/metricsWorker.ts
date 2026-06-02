@@ -4,6 +4,7 @@ import supabaseService from '../services/supabaseService'
 import nuvemshopService, { NuvemshopMetrics, NuvemshopOrder } from '../services/nuvemshopService'
 import openaiService from '../services/openaiService'
 import emailService from '../services/emailService'
+import evolutionApiService from '../services/evolutionApiService'
 import instagramService from '../services/instagramService'
 import anomalyDetector from './anomalyDetector'
 
@@ -337,6 +338,121 @@ async function runAIAnalysis(): Promise<void> {
   }
 }
 
+async function generateAndSendDailyReport(): Promise<void> {
+  try {
+    console.log('[MetricsWorker] Generating daily report...')
+
+    const todayMidnight = getBrazilMidnightUTC()
+    const yesterdayMidnight = new Date(todayMidnight.getTime() - 24 * 60 * 60 * 1000)
+
+    // Fetch 48h of orders to compute today vs yesterday comparison
+    const allOrders = await nuvemshopService.fetchOrders(yesterdayMidnight)
+
+    const todayOrders = allOrders.filter((o) => new Date(o.created_at) >= todayMidnight)
+    const yesterdayOrders = allOrders.filter((o) => {
+      const d = new Date(o.created_at)
+      return d >= yesterdayMidnight && d < todayMidnight
+    })
+
+    const metrics = nuvemshopService.computeMetrics(todayOrders)
+    const yestMetrics = nuvemshopService.computeMetrics(yesterdayOrders)
+    const cardApproval = nuvemshopService.computeCardApprovalRate(todayOrders)
+
+    // Fetch all alerts created today
+    const todayAlerts = await supabaseService.getAlerts({
+      since: todayMidnight.toISOString(),
+      limit: 200,
+    })
+
+    const alertCounts = { critical: 0, high: 0, medium: 0, low: 0 }
+    for (const a of todayAlerts) {
+      if (a.severity in alertCounts) {
+        alertCounts[a.severity as keyof typeof alertCounts]++
+      }
+    }
+
+    const fmtBRL = (v: number) =>
+      `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+    const fmtPct = (v: number) => `${v.toFixed(1)}%`
+    const pctDiff = (today: number, yest: number): string => {
+      if (yest === 0) return ''
+      const p = ((today - yest) / yest) * 100
+      return p >= 0 ? ` ↑${p.toFixed(1)}%` : ` ↓${Math.abs(p).toFixed(1)}%`
+    }
+
+    const dateStr = new Date().toLocaleDateString('pt-BR', {
+      timeZone: 'America/Sao_Paulo',
+      weekday: 'long',
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    })
+
+    const totalOrders = metrics.orders_count
+    const pixPct =
+      totalOrders > 0 ? ((metrics.pix_orders / totalOrders) * 100).toFixed(1) : '0'
+    const cardPct =
+      totalOrders > 0 ? ((metrics.card_orders / totalOrders) * 100).toFixed(1) : '0'
+    const boletoPct =
+      totalOrders > 0 ? ((metrics.boleto_orders / totalOrders) * 100).toFixed(1) : '0'
+    const totalAlerts =
+      alertCounts.critical + alertCounts.high + alertCounts.medium + alertCounts.low
+
+    const lines: string[] = [
+      '📊 *RELATÓRIO DIÁRIO — Saint Germain*',
+      `_${dateStr}_`,
+      '',
+      '──────────────────────────',
+      '💰 *FATURAMENTO*',
+      '──────────────────────────',
+      `Total: *${fmtBRL(metrics.revenue_brl)}*${pctDiff(metrics.revenue_brl, yestMetrics.revenue_brl)}`,
+      `Pedidos: *${totalOrders}*${pctDiff(totalOrders, yestMetrics.orders_count)}`,
+      `Ticket Médio: *${fmtBRL(metrics.avg_ticket_brl)}*`,
+      `Conversão: *${fmtPct(metrics.conversion_rate)}*`,
+      '',
+      '──────────────────────────',
+      '💳 *PAGAMENTOS*',
+      '──────────────────────────',
+      `PIX: ${metrics.pix_orders} pedidos (${pixPct}%)`,
+      `Cartão: ${metrics.card_orders} pedidos (${cardPct}%)`,
+    ]
+
+    if (metrics.boleto_orders > 0) {
+      lines.push(`Boleto: ${metrics.boleto_orders} pedidos (${boletoPct}%)`)
+    }
+
+    lines.push(
+      `Aprovação Cartão: *${fmtPct(cardApproval.rate)}*`,
+      `Cupons utilizados: ${metrics.coupon_uses}`,
+      '',
+      '──────────────────────────',
+      '🔔 *ALERTAS DO DIA*',
+      '──────────────────────────',
+    )
+
+    if (totalAlerts === 0) {
+      lines.push('✅ Nenhum alerta gerado hoje')
+    } else {
+      if (alertCounts.critical > 0) lines.push(`🚨 Críticos: ${alertCounts.critical}`)
+      if (alertCounts.high > 0) lines.push(`⚠️ Altos: ${alertCounts.high}`)
+      if (alertCounts.medium > 0) lines.push(`🟡 Médios: ${alertCounts.medium}`)
+      if (alertCounts.low > 0) lines.push(`🟢 Baixos: ${alertCounts.low}`)
+      lines.push(`Total: ${totalAlerts} alerta${totalAlerts !== 1 ? 's' : ''}`)
+    }
+
+    lines.push('', '_Central Operacional SG · 23:59_')
+
+    const report = lines.join('\n')
+
+    await evolutionApiService.sendDailyReport(report)
+    await emailService.sendDailySummary(report)
+
+    console.log('[MetricsWorker] Daily report sent successfully')
+  } catch (error) {
+    console.error('[MetricsWorker] Error generating daily report:', error)
+  }
+}
+
 export function startMetricsWorker(): void {
   console.log('[MetricsWorker] Starting cron jobs...')
 
@@ -360,7 +476,14 @@ export function startMetricsWorker(): void {
     await instagramService.pollRecentComments()
   })
 
+  // Daily report at 23:59 Brazil time (Sao Paulo = UTC-3, no DST)
+  cron.schedule('59 23 * * *', async () => {
+    await generateAndSendDailyReport()
+  }, {
+    timezone: 'America/Sao_Paulo',
+  })
+
   console.log('[MetricsWorker] Cron jobs registered successfully')
 }
 
-export { fetchAndAnalyzeMetrics, checkSiteUptime, runAIAnalysis }
+export { fetchAndAnalyzeMetrics, checkSiteUptime, runAIAnalysis, generateAndSendDailyReport }

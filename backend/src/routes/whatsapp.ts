@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express'
 import evolutionApiService from '../services/evolutionApiService'
 import supabaseService from '../services/supabaseService'
+import { generateAndSendDailyReport } from '../workers/metricsWorker'
 
 const router = Router()
 
@@ -77,7 +78,7 @@ router.post('/send-alert', async (req: Request, res: Response) => {
   }
 })
 
-// POST /api/whatsapp/send-report - send daily report
+// POST /api/whatsapp/send-report - send daily report (manual text)
 router.post('/send-report', async (req: Request, res: Response) => {
   try {
     const { report_text } = req.body
@@ -91,6 +92,17 @@ router.post('/send-report', async (req: Request, res: Response) => {
   } catch (error) {
     console.error('[WhatsAppRoute] Error sending report:', error)
     res.status(500).json({ error: 'Failed to send report' })
+  }
+})
+
+// POST /api/whatsapp/send-daily-report - generate and send today's full report now
+router.post('/send-daily-report', async (_req: Request, res: Response) => {
+  try {
+    await generateAndSendDailyReport()
+    res.json({ success: true, message: 'Daily report generated and sent' })
+  } catch (error) {
+    console.error('[WhatsAppRoute] Error sending daily report:', error)
+    res.status(500).json({ error: 'Failed to send daily report' })
   }
 })
 
