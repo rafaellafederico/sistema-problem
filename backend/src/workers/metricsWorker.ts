@@ -444,7 +444,6 @@ async function generateAndSendDailyReport(): Promise<void> {
 
     const report = lines.join('\n')
 
-    await evolutionApiService.sendDailyReport(report)
     await emailService.sendDailySummary(report)
 
     console.log('[MetricsWorker] Daily report sent successfully')

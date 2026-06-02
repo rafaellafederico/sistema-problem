@@ -95,11 +95,11 @@ router.post('/send-report', async (req: Request, res: Response) => {
   }
 })
 
-// POST /api/whatsapp/send-daily-report - generate and send today's full report now
-router.post('/send-daily-report', async (_req: Request, res: Response) => {
+// GET /api/whatsapp/send-daily-report - generate and send today's full report now (manual trigger)
+router.get('/send-daily-report', async (_req: Request, res: Response) => {
   try {
     await generateAndSendDailyReport()
-    res.json({ success: true, message: 'Daily report generated and sent' })
+    res.json({ success: true, message: 'Relatório gerado e enviado por e-mail' })
   } catch (error) {
     console.error('[WhatsAppRoute] Error sending daily report:', error)
     res.status(500).json({ error: 'Failed to send daily report' })
