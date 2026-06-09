@@ -13,6 +13,7 @@ import metricsRouter from './routes/metrics'
 import alertsRouter from './routes/alerts'
 import instagramRouter from './routes/instagram'
 import nuvemshopRouter from './routes/nuvemshop'
+import whatsappRouter from './routes/whatsapp'
 import aiRouter from './routes/ai'
 import { startMetricsWorker } from './workers/metricsWorker'
 
@@ -85,6 +86,7 @@ app.use('/api/metrics', metricsRouter)
 app.use('/api/alerts', alertsRouter)
 app.use('/api/instagram', instagramRouter)
 app.use('/api/nuvemshop', nuvemshopRouter)
+app.use('/api/whatsapp', whatsappRouter)
 app.use('/api/ai', strictLimiter, aiRouter)
 
 // Health check
